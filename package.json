@@ -19,7 +19,6 @@
   ],
   "author": "Fantasy Golf Team",
   "license": "ISC",
-  "type": "module",
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
     "@supabase/supabase-js": "^2.49.2",
