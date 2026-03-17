@@ -6,6 +6,7 @@ const refreshButton = document.getElementById('refresh');
 const yearToggleNode = document.getElementById('year-toggle');
 const leagueToggleNode = document.getElementById('league-toggle');
 const newLeagueButton = document.getElementById('new-league');
+const deleteLeagueButton = document.getElementById('delete-league');
 const leagueModal = document.getElementById('league-modal');
 const closeLeagueModalButton = document.getElementById('close-league-modal');
 const leagueForm = document.getElementById('league-form');
@@ -13,6 +14,7 @@ const leagueNameInput = document.getElementById('league-name-input');
 const addLeagueUserButton = document.getElementById('add-league-user');
 const leagueUsersList = document.getElementById('league-users-list');
 const leagueFormStatus = document.getElementById('league-form-status');
+const playerOptionsNode = document.getElementById('player-options');
 
 const DEFAULT_LEAGUE_NAME = 'Davidson';
 
@@ -27,6 +29,9 @@ let leagueLimits = {
   minPlayersPerUser: 4,
   maxPlayersPerUser: 8
 };
+let topPlayers = [];
+let topPlayersSeasonYear = null;
+const topPlayerByNormalizedName = new Map();
 
 function normalizePlayerName(name) {
   if (!name) {
@@ -163,6 +168,86 @@ function syncLeagueToggle() {
     .map((name) => `<option value="${name}">${name}</option>`)
     .join('');
   leagueToggleNode.value = selectedLeagueName;
+  syncDeleteLeagueButton();
+}
+
+function syncDeleteLeagueButton() {
+  if (!deleteLeagueButton) {
+    return;
+  }
+
+  const isDefaultLeague = selectedLeagueName === DEFAULT_LEAGUE_NAME;
+  deleteLeagueButton.disabled = isDefaultLeague;
+  deleteLeagueButton.title = isDefaultLeague
+    ? `${DEFAULT_LEAGUE_NAME} is the default league and cannot be deleted.`
+    : `Delete ${selectedLeagueName}`;
+}
+
+function setTopPlayers(players, seasonYear) {
+  topPlayers = Array.isArray(players) ? players : [];
+  topPlayersSeasonYear = seasonYear;
+  topPlayerByNormalizedName.clear();
+
+  const optionsMarkup = topPlayers
+    .map((player) => {
+      const name = String(player?.name || '').trim();
+      if (!name) {
+        return '';
+      }
+
+      const normalized = normalizePlayerName(name);
+      if (!normalized || topPlayerByNormalizedName.has(normalized)) {
+        return '';
+      }
+
+      topPlayerByNormalizedName.set(normalized, name);
+      const rank = player?.rank ? `#${player.rank} ` : '';
+      return `<option value="${name}" label="${rank}${name}"></option>`;
+    })
+    .join('');
+
+  if (playerOptionsNode) {
+    playerOptionsNode.innerHTML = optionsMarkup;
+  }
+}
+
+function canonicalPlayerName(rawName) {
+  const normalized = normalizePlayerName(rawName);
+  return normalized ? topPlayerByNormalizedName.get(normalized) || null : null;
+}
+
+async function loadTopPlayers(forceRefresh = false) {
+  const params = new URLSearchParams({
+    year: String(selectedSeasonYear)
+  });
+  if (forceRefresh) {
+    params.set('refresh', '1');
+  }
+
+  const response = await fetch(`/api/players?${params.toString()}`);
+  let responseBody = null;
+  try {
+    responseBody = await response.json();
+  } catch (error) {
+    responseBody = null;
+  }
+
+  if (!response.ok) {
+    const message = responseBody?.detail || responseBody?.error || `Request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  const seasonYear = Number.parseInt(String(responseBody?.seasonYear || selectedSeasonYear), 10);
+  setTopPlayers(Array.isArray(responseBody?.players) ? responseBody.players : [], seasonYear);
+  return responseBody;
+}
+
+async function ensureTopPlayersLoaded() {
+  if (topPlayers.length > 0 && topPlayersSeasonYear === selectedSeasonYear) {
+    return;
+  }
+
+  await loadTopPlayers(false);
 }
 
 function makeEmptySelections(majors) {
@@ -378,13 +463,56 @@ async function loadLeagues(preferredLeagueName = selectedLeagueName) {
   syncLeagueToggle();
 }
 
+function createLeaguePlayerRow(initialPlayerName = '') {
+  const row = document.createElement('div');
+  row.className = 'league-player-row';
+  row.innerHTML = `
+    <input
+      type="text"
+      class="league-player-input"
+      list="player-options"
+      placeholder="Start typing a golfer name"
+      value="${String(initialPlayerName || '').trim()}"
+      autocomplete="off"
+    />
+    <button type="button" class="ghost-button remove-player-button">Remove</button>
+  `;
+  return row;
+}
+
+function getLeagueUserRows() {
+  return Array.from(leagueUsersList.querySelectorAll('.league-user-row'));
+}
+
+function getPlayerRowsForUser(userRow) {
+  return Array.from(userRow.querySelectorAll('.league-player-row'));
+}
+
+function addPlayerRowToUser(userRow, initialPlayerName = '') {
+  const playerList = userRow.querySelector('.league-player-list');
+  if (!playerList) {
+    return false;
+  }
+
+  const currentCount = getPlayerRowsForUser(userRow).length;
+  if (currentCount >= leagueLimits.maxPlayersPerUser) {
+    leagueFormStatus.textContent = `Each user can have up to ${leagueLimits.maxPlayersPerUser} golfers.`;
+    return false;
+  }
+
+  playerList.appendChild(createLeaguePlayerRow(initialPlayerName));
+  return true;
+}
+
+function ensureMinimumPlayerRows(userRow) {
+  while (getPlayerRowsForUser(userRow).length < leagueLimits.minPlayersPerUser) {
+    addPlayerRowToUser(userRow);
+  }
+}
+
 function createLeagueUserRow(initialUser = null) {
   const row = document.createElement('div');
   row.className = 'league-user-row';
-
-  const userName = initialUser?.name || '';
-  const playerLines = Array.isArray(initialUser?.players) ? initialUser.players.join('\n') : '';
-
   row.innerHTML = `
     <div class="league-user-row-top">
       <input
@@ -392,17 +520,27 @@ function createLeagueUserRow(initialUser = null) {
         class="league-user-name"
         maxlength="80"
         placeholder="User name"
-        value="${userName}"
+        value="${String(initialUser?.name || '').trim()}"
       />
-      <button type="button" class="ghost-button remove-league-user">Remove</button>
+      <div class="league-player-actions">
+        <button type="button" class="secondary-button add-player-button">+ Player</button>
+        <button type="button" class="ghost-button remove-league-user">Remove User</button>
+      </div>
     </div>
-    <textarea
-      class="league-user-players"
-      rows="4"
-      placeholder="One golfer per line"
-    >${playerLines}</textarea>
+    <div class="league-player-list"></div>
   `;
 
+  const initialPlayers = Array.isArray(initialUser?.players)
+    ? initialUser.players.slice(0, leagueLimits.maxPlayersPerUser)
+    : [];
+  const seeds = initialPlayers.length
+    ? initialPlayers
+    : Array.from({ length: leagueLimits.minPlayersPerUser }, () => '');
+
+  for (const playerName of seeds) {
+    addPlayerRowToUser(row, playerName);
+  }
+  ensureMinimumPlayerRows(row);
   return row;
 }
 
@@ -414,12 +552,21 @@ function resetLeagueForm() {
   leagueUsersList.appendChild(createLeagueUserRow());
 }
 
-function openLeagueModal() {
+async function openLeagueModal() {
   if (!leagueModal) {
     return;
   }
+
   resetLeagueForm();
   leagueModal.classList.remove('hidden');
+  leagueFormStatus.textContent = 'Loading top players...';
+
+  try {
+    await ensureTopPlayersLoaded();
+    leagueFormStatus.textContent = '';
+  } catch (error) {
+    leagueFormStatus.textContent = `Could not load top players: ${error.message}`;
+  }
 }
 
 function closeLeagueModal() {
@@ -430,7 +577,7 @@ function closeLeagueModal() {
 }
 
 function addLeagueUserRow() {
-  const currentCount = leagueUsersList.querySelectorAll('.league-user-row').length;
+  const currentCount = getLeagueUserRows().length;
   if (currentCount >= leagueLimits.maxUsers) {
     leagueFormStatus.textContent = `You can add up to ${leagueLimits.maxUsers} users per league.`;
     return;
@@ -440,8 +587,83 @@ function addLeagueUserRow() {
   leagueFormStatus.textContent = '';
 }
 
+function validateLeaguePlayerAssignments(showStatus = false) {
+  const playerInputs = Array.from(leagueUsersList.querySelectorAll('.league-player-input'));
+  for (const input of playerInputs) {
+    input.setCustomValidity('');
+  }
+
+  if (topPlayerByNormalizedName.size === 0) {
+    const message = 'Top player list is still loading. Please try again in a moment.';
+    if (showStatus) {
+      leagueFormStatus.textContent = message;
+    }
+    return {
+      ok: false,
+      message
+    };
+  }
+
+  const playerMap = new Map();
+  let errorMessage = '';
+
+  for (const userRow of getLeagueUserRows()) {
+    const userName = String(userRow.querySelector('.league-user-name')?.value || '').trim() || 'Unnamed User';
+    const userPlayerInputs = Array.from(userRow.querySelectorAll('.league-player-input'));
+
+    for (const input of userPlayerInputs) {
+      const rawValue = String(input.value || '').trim();
+      if (!rawValue) {
+        continue;
+      }
+
+      const canonical = canonicalPlayerName(rawValue);
+      if (!canonical) {
+        input.setCustomValidity('Choose a golfer from the top-200 dropdown list.');
+        if (!errorMessage) {
+          errorMessage = `Unknown golfer "${rawValue}". Choose from the top-200 list.`;
+        }
+        continue;
+      }
+
+      input.value = canonical;
+      if (!playerMap.has(canonical)) {
+        playerMap.set(canonical, []);
+      }
+      playerMap.get(canonical).push({
+        input,
+        userName
+      });
+    }
+  }
+
+  for (const [playerName, assignments] of playerMap.entries()) {
+    if (assignments.length <= 1) {
+      continue;
+    }
+
+    const users = assignments.map((assignment) => assignment.userName);
+    const duplicateMessage = `${playerName} is assigned more than once (${users.join(', ')}).`;
+    for (const assignment of assignments) {
+      assignment.input.setCustomValidity('A golfer can only be used by one user in a league.');
+    }
+    if (!errorMessage) {
+      errorMessage = duplicateMessage;
+    }
+  }
+
+  if (showStatus) {
+    leagueFormStatus.textContent = errorMessage;
+  }
+
+  return {
+    ok: !errorMessage,
+    message: errorMessage
+  };
+}
+
 function collectLeagueUsersFromForm() {
-  const rows = Array.from(leagueUsersList.querySelectorAll('.league-user-row'));
+  const rows = getLeagueUserRows();
   if (!rows.length) {
     throw new Error('Add at least one user.');
   }
@@ -452,10 +674,10 @@ function collectLeagueUsersFromForm() {
 
   const users = [];
   const seenUserNames = new Set();
+  const seenLeaguePlayers = new Map();
 
   for (const [index, row] of rows.entries()) {
     const userNameInput = row.querySelector('.league-user-name');
-    const playersInput = row.querySelector('.league-user-players');
     const userName = String(userNameInput?.value || '').trim();
 
     if (!userName) {
@@ -468,31 +690,47 @@ function collectLeagueUsersFromForm() {
     }
     seenUserNames.add(normalizedUserName);
 
-    const players = String(playersInput?.value || '')
-      .split('\n')
-      .map((name) => name.trim())
-      .filter(Boolean);
+    const playerInputs = Array.from(row.querySelectorAll('.league-player-input'));
+    const players = [];
+    const seenUserPlayers = new Set();
 
-    const uniquePlayers = [];
-    const seenPlayers = new Set();
-    for (const player of players) {
-      const normalizedPlayer = normalizePlayerName(player);
-      if (seenPlayers.has(normalizedPlayer)) {
+    for (const input of playerInputs) {
+      const rawValue = String(input.value || '').trim();
+      if (!rawValue) {
         continue;
       }
-      seenPlayers.add(normalizedPlayer);
-      uniquePlayers.push(player);
+
+      const canonical = canonicalPlayerName(rawValue);
+      if (!canonical) {
+        throw new Error(`Unknown golfer "${rawValue}" for ${userName}. Choose from the top-200 list.`);
+      }
+
+      const normalizedPlayer = normalizePlayerName(canonical);
+      if (seenUserPlayers.has(normalizedPlayer)) {
+        continue;
+      }
+      seenUserPlayers.add(normalizedPlayer);
+      players.push(canonical);
     }
 
-    if (uniquePlayers.length < leagueLimits.minPlayersPerUser || uniquePlayers.length > leagueLimits.maxPlayersPerUser) {
+    if (players.length < leagueLimits.minPlayersPerUser || players.length > leagueLimits.maxPlayersPerUser) {
       throw new Error(
         `${userName} must have ${leagueLimits.minPlayersPerUser}-${leagueLimits.maxPlayersPerUser} golfers.`
       );
     }
 
+    for (const playerName of players) {
+      const normalizedPlayer = normalizePlayerName(playerName);
+      if (seenLeaguePlayers.has(normalizedPlayer)) {
+        const existingUser = seenLeaguePlayers.get(normalizedPlayer);
+        throw new Error(`${playerName} is already assigned to ${existingUser}.`);
+      }
+      seenLeaguePlayers.set(normalizedPlayer, userName);
+    }
+
     users.push({
       name: userName,
-      players: uniquePlayers
+      players
     });
   }
 
@@ -506,6 +744,11 @@ async function createLeagueFromForm(event) {
   const leagueName = String(leagueNameInput.value || '').trim();
   if (!leagueName) {
     leagueFormStatus.textContent = 'League name is required.';
+    return;
+  }
+
+  const liveValidation = validateLeaguePlayerAssignments(true);
+  if (!liveValidation.ok) {
     return;
   }
 
@@ -544,6 +787,44 @@ async function createLeagueFromForm(event) {
     statusNode.textContent = `Created league ${savedLeagueName}.`;
   } catch (error) {
     leagueFormStatus.textContent = error.message;
+  }
+}
+
+async function deleteCurrentLeague() {
+  if (selectedLeagueName === DEFAULT_LEAGUE_NAME) {
+    statusNode.textContent = `${DEFAULT_LEAGUE_NAME} is the default league and cannot be deleted.`;
+    return;
+  }
+
+  const confirmed = window.confirm(`Delete league "${selectedLeagueName}"? This cannot be undone.`);
+  if (!confirmed) {
+    return;
+  }
+
+  statusNode.textContent = `Deleting league ${selectedLeagueName}...`;
+
+  try {
+    const response = await fetch('/api/leagues', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: selectedLeagueName
+      })
+    });
+
+    const responseBody = await response.json();
+    if (!response.ok) {
+      throw new Error(responseBody?.detail || responseBody?.error || `Request failed with status ${response.status}`);
+    }
+
+    await loadLeagues(DEFAULT_LEAGUE_NAME);
+    selectedLeagueName = DEFAULT_LEAGUE_NAME;
+    await loadData(false);
+    statusNode.textContent = `Deleted league ${responseBody?.league?.name || 'selected league'}.`;
+  } catch (error) {
+    statusNode.textContent = `Could not delete league: ${error.message}`;
   }
 }
 
@@ -1057,6 +1338,12 @@ async function initializeApp() {
     syncLeagueToggle();
   }
 
+  try {
+    await loadTopPlayers(false);
+  } catch (error) {
+    statusNode.textContent = `Could not load top players: ${error.message}`;
+  }
+
   await loadData(false);
 }
 
@@ -1073,6 +1360,9 @@ if (yearToggleNode) {
     const parsedYear = Number.parseInt(String(target.value || ''), 10);
     if (!Number.isNaN(parsedYear)) {
       selectedSeasonYear = parsedYear;
+      loadTopPlayers(false).catch((error) => {
+        statusNode.textContent = `Could not refresh top players: ${error.message}`;
+      });
       loadData(false);
     }
   });
@@ -1090,7 +1380,15 @@ if (leagueToggleNode) {
 }
 
 if (newLeagueButton) {
-  newLeagueButton.addEventListener('click', openLeagueModal);
+  newLeagueButton.addEventListener('click', () => {
+    openLeagueModal();
+  });
+}
+
+if (deleteLeagueButton) {
+  deleteLeagueButton.addEventListener('click', () => {
+    deleteCurrentLeague();
+  });
 }
 
 if (closeLeagueModalButton) {
@@ -1111,6 +1409,37 @@ if (addLeagueUserButton) {
 
 if (leagueUsersList) {
   leagueUsersList.addEventListener('click', (event) => {
+    const addPlayerButton = event.target.closest('.add-player-button');
+    if (addPlayerButton) {
+      const userRow = addPlayerButton.closest('.league-user-row');
+      if (!userRow) {
+        return;
+      }
+
+      addPlayerRowToUser(userRow);
+      validateLeaguePlayerAssignments(true);
+      return;
+    }
+
+    const removePlayerButton = event.target.closest('.remove-player-button');
+    if (removePlayerButton) {
+      const playerRow = removePlayerButton.closest('.league-player-row');
+      const userRow = removePlayerButton.closest('.league-user-row');
+      if (!playerRow || !userRow) {
+        return;
+      }
+
+      const playerRows = getPlayerRowsForUser(userRow);
+      if (playerRows.length <= leagueLimits.minPlayersPerUser) {
+        leagueFormStatus.textContent = `Each user needs at least ${leagueLimits.minPlayersPerUser} golfers.`;
+        return;
+      }
+
+      playerRow.remove();
+      validateLeaguePlayerAssignments(true);
+      return;
+    }
+
     const removeButton = event.target.closest('.remove-league-user');
     if (!removeButton) {
       return;
@@ -1125,6 +1454,29 @@ if (leagueUsersList) {
     if (!leagueUsersList.querySelector('.league-user-row')) {
       addLeagueUserRow();
     }
+    validateLeaguePlayerAssignments(true);
+  });
+
+  leagueUsersList.addEventListener('change', (event) => {
+    const playerInput = event.target.closest('.league-player-input');
+    if (!playerInput) {
+      return;
+    }
+
+    const canonical = canonicalPlayerName(playerInput.value);
+    if (canonical) {
+      playerInput.value = canonical;
+    }
+    validateLeaguePlayerAssignments(true);
+  });
+
+  leagueUsersList.addEventListener('input', (event) => {
+    const playerInput = event.target.closest('.league-player-input');
+    if (!playerInput) {
+      return;
+    }
+
+    playerInput.setCustomValidity('');
   });
 }
 

@@ -18,6 +18,7 @@
             <select id="league-toggle" aria-label="Select league"></select>
           </label>
           <button id="new-league" type="button" class="secondary-button">New League</button>
+          <button id="delete-league" type="button" class="danger-button">Delete League</button>
           <label class="year-toggle-wrap" for="year-toggle">
             <span>Season</span>
             <select id="year-toggle" aria-label="Select season year">
@@ -50,7 +51,7 @@
             <h3>Users</h3>
             <button id="add-league-user" type="button" class="secondary-button">Add User</button>
           </div>
-          <p class="footnote">Each user needs 4-8 golfers (one golfer per line).</p>
+          <p class="footnote">Each user needs 4-8 golfers. Start with 4 and click + Player to add more.</p>
           <div id="league-users-list" class="league-users-list"></div>
           <div class="modal-actions">
             <button type="submit">Save League</button>
@@ -59,6 +60,8 @@
         </form>
       </div>
     </div>
+
+    <datalist id="player-options"></datalist>
 
     <script src="/app.js"></script>
   </body>

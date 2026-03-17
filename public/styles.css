@@ -103,6 +103,11 @@ button:hover {
   opacity: 0.9;
 }
 
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .secondary-button {
   background: #e9eeee;
   color: #2b3336;
@@ -113,6 +118,12 @@ button:hover {
   background: transparent;
   color: #2f3a3f;
   border: 1px solid #d0d8d9;
+}
+
+.danger-button {
+  background: #fbe5e3;
+  color: #77201a;
+  border: 1px solid #f0bab4;
 }
 
 .updated-at {
@@ -437,14 +448,29 @@ tbody tr:hover {
   padding: 0.45rem 0.6rem;
 }
 
-.league-user-row textarea {
-  width: 100%;
+.league-player-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.league-player-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.league-player-row input {
   border: 1px solid #cdd7d8;
   border-radius: 10px;
-  font-size: 0.88rem;
-  line-height: 1.4;
-  padding: 0.5rem 0.6rem;
-  resize: vertical;
+  font-size: 0.9rem;
+  padding: 0.45rem 0.6rem;
+}
+
+.league-player-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
 }
 
 .modal-actions {
