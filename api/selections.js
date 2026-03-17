@@ -135,28 +135,46 @@ function sanitizeSelectionsPayload(teamDefinition, rawSelections) {
   return selections;
 }
 
-function readJsonBody(req) {
-  if (!req.body) {
+async function readRawRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => resolve(body));
+    req.on('error', reject);
+  });
+}
+
+function parseJsonText(text) {
+  if (!String(text || '').trim()) {
     return {};
   }
 
-  if (typeof req.body === 'object') {
-    return req.body;
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error('Invalid JSON body.');
   }
+}
 
-  if (typeof req.body === 'string') {
-    if (!req.body.trim()) {
-      return {};
+async function readJsonBody(req) {
+  if (req.body !== undefined && req.body !== null) {
+    if (Buffer.isBuffer(req.body)) {
+      return parseJsonText(req.body.toString('utf8'));
     }
 
-    try {
-      return JSON.parse(req.body);
-    } catch (error) {
-      throw new Error('Invalid JSON body.');
+    if (typeof req.body === 'string') {
+      return parseJsonText(req.body);
+    }
+
+    if (typeof req.body === 'object') {
+      return req.body;
     }
   }
 
-  throw new Error('Invalid JSON body.');
+  const rawBody = await readRawRequestBody(req);
+  return parseJsonText(rawBody);
 }
 
 async function fetchStoredSelections(seasonYear) {
@@ -244,7 +262,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const body = readJsonBody(req);
+      const body = await readJsonBody(req);
       const bodySeasonYear = parseSeasonYear(body?.seasonYear);
       const teamName = String(body?.teamName || '').trim();
       const selections = body?.selections || {};
