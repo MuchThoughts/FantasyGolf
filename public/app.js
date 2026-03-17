@@ -10,6 +10,19 @@ let teamUiState = {};
 let activeTab = 'season';
 let selectedSeasonYear = 2025;
 
+function normalizePlayerName(name) {
+  if (!name) {
+    return '';
+  }
+
+  return String(name)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 function scoreClass(score) {
   if (score === null || score === undefined || score === 'N/A') {
     return 'na';
@@ -101,6 +114,155 @@ function makeEmptySelections(majors) {
     selections[major.key] = new Set();
   }
   return selections;
+}
+
+function hasAnySelections(selections, majors) {
+  return (majors || []).some((major) => (selections?.[major.key]?.size || 0) > 0);
+}
+
+function getTeamByName(teamName) {
+  return (currentPayload?.teams || []).find((team) => team.name === teamName) || null;
+}
+
+function serializeSelectionsForApi(team, selections, majors) {
+  const result = {};
+  const teamPlayers = team?.players || [];
+
+  for (const major of majors || []) {
+    const names = [];
+    const seen = new Set();
+    const selectedIndexes = Array.from(selections?.[major.key] || []);
+
+    for (const index of selectedIndexes) {
+      if (!Number.isInteger(index) || index < 0 || index >= teamPlayers.length) {
+        continue;
+      }
+
+      const playerName = teamPlayers[index]?.name;
+      if (!playerName || seen.has(playerName)) {
+        continue;
+      }
+
+      names.push(playerName);
+      seen.add(playerName);
+
+      if (names.length === 4) {
+        break;
+      }
+    }
+
+    result[major.key] = names;
+  }
+
+  return result;
+}
+
+function buildSelectionsFromSavedRow(team, majors, rawSelections) {
+  const selections = makeEmptySelections(majors || []);
+  const playerIndexByName = new Map(
+    (team?.players || []).map((player, index) => [normalizePlayerName(player.name), index])
+  );
+
+  for (const major of majors || []) {
+    const rawNames = Array.isArray(rawSelections?.[major.key]) ? rawSelections[major.key] : [];
+    const selectedSet = selections[major.key] || new Set();
+
+    for (const rawName of rawNames) {
+      const normalized = normalizePlayerName(rawName);
+      const playerIndex = playerIndexByName.get(normalized);
+
+      if (typeof playerIndex !== 'number') {
+        continue;
+      }
+
+      selectedSet.add(playerIndex);
+      if (selectedSet.size === 4) {
+        break;
+      }
+    }
+
+    selections[major.key] = selectedSet;
+  }
+
+  return selections;
+}
+
+function hydrateSavedSelections(payload, rows) {
+  const rowsByTeamName = new Map();
+  for (const row of rows || []) {
+    const teamName = String(row?.team_name || '').trim();
+    if (teamName) {
+      rowsByTeamName.set(teamName, row);
+    }
+  }
+
+  for (const team of payload?.teams || []) {
+    const state = ensureTeamState(team.name);
+    const savedRow = rowsByTeamName.get(team.name);
+
+    if (!savedRow) {
+      continue;
+    }
+
+    state.selections = buildSelectionsFromSavedRow(team, payload?.majors || [], savedRow.selections || {});
+    state.hasSavedSelection = hasAnySelections(state.selections, payload?.majors || []);
+  }
+}
+
+async function fetchSavedSelectionsForSeason(seasonYear) {
+  const response = await fetch(`/api/selections?year=${seasonYear}`);
+
+  let responseBody = null;
+  try {
+    responseBody = await response.json();
+  } catch (error) {
+    responseBody = null;
+  }
+
+  if (!response.ok) {
+    const message = responseBody?.detail || responseBody?.error || `Request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  return {
+    configured: responseBody?.configured !== false,
+    rows: Array.isArray(responseBody?.rows) ? responseBody.rows : []
+  };
+}
+
+async function persistTeamSelections(teamName, selections) {
+  const team = getTeamByName(teamName);
+  if (!team || !currentPayload) {
+    throw new Error(`Unable to find team: ${teamName}`);
+  }
+
+  const body = {
+    seasonYear: selectedSeasonYear,
+    teamName,
+    selections: serializeSelectionsForApi(team, selections, currentPayload.majors || [])
+  };
+
+  const response = await fetch('/api/selections', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  let responseBody = null;
+  try {
+    responseBody = await response.json();
+  } catch (error) {
+    responseBody = null;
+  }
+
+  if (!response.ok) {
+    const message = responseBody?.detail || responseBody?.error || `Request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  return responseBody;
 }
 
 function initializeTeamState(payload) {
@@ -527,12 +689,24 @@ function onContainerClick(event) {
 
   if (state.editing) {
     state.editing = false;
-    state.hasSavedSelection = true;
-    statusNode.textContent = `Saved selections for ${teamName}.`;
+    state.hasSavedSelection = hasAnySelections(state.selections, currentPayload.majors || []);
+    renderApp(currentPayload);
+
+    statusNode.textContent = `Saving selections for ${teamName}...`;
+    persistTeamSelections(teamName, state.selections)
+      .then(() => {
+        statusNode.textContent = `Saved selections for ${teamName} (${selectedSeasonYear}).`;
+      })
+      .catch((error) => {
+        statusNode.textContent = `Saved locally for ${teamName}, but Supabase sync failed: ${error.message}`;
+      });
+    return;
   } else {
     activeTab = 'season';
     state.editing = true;
-    state.selections = makeEmptySelections(currentPayload.majors || []);
+    if (!state.hasSavedSelection) {
+      state.selections = makeEmptySelections(currentPayload.majors || []);
+    }
     statusNode.textContent = `Editing ${teamName}: choose up to 4 players per major.`;
   }
 
@@ -594,11 +768,27 @@ async function loadData(forceRefresh = false) {
     activeTab = 'season';
     syncYearToggle(currentPayload);
     initializeTeamState(currentPayload);
+
+    let selectionsStatusNote = '';
+    try {
+      const selectionsPayload = await fetchSavedSelectionsForSeason(selectedSeasonYear);
+      if (selectionsPayload.configured) {
+        hydrateSavedSelections(currentPayload, selectionsPayload.rows);
+      } else {
+        selectionsStatusNote = 'Supabase is not configured yet, so picks are not being persisted.';
+      }
+    } catch (error) {
+      selectionsStatusNote = `Could not load saved picks: ${error.message}`;
+    }
+
     renderApp(currentPayload);
 
     subtitleNode.textContent = `${getSeasonTabLabel()} for ${selectedSeasonYear} with tabbed major scoreboards.`;
     updatedAtNode.textContent = `Updated ${toFriendlyDate(currentPayload.updatedAt)}`;
     setDefaultStatusForTab();
+    if (selectionsStatusNote) {
+      statusNode.textContent = `${statusNode.textContent} ${selectionsStatusNote}`;
+    }
   } catch (error) {
     statusNode.textContent = `Error loading data: ${error.message}`;
     teamsContainer.innerHTML = '<p class="status">Unable to load data.</p>';

@@ -101,6 +101,28 @@ const MIME_TYPES = {
 
 const cache = new Map();
 
+function getSupabaseConfig() {
+  const url = process.env.SUPABASE_URL || '';
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '';
+
+  if (!url || !serviceRoleKey) {
+    return null;
+  }
+
+  return {
+    url: url.replace(/\/$/, ''),
+    serviceRoleKey
+  };
+}
+
+function getSupabaseHeaders(supabaseConfig) {
+  return {
+    apikey: supabaseConfig.serviceRoleKey,
+    Authorization: `Bearer ${supabaseConfig.serviceRoleKey}`,
+    'Content-Type': 'application/json'
+  };
+}
+
 function normalizeName(name) {
   if (!name) {
     return '';
@@ -204,6 +226,131 @@ function parseSeasonYear(value) {
   }
 
   return parsed;
+}
+
+function getTeamDefinition(teamName) {
+  return TEAM_DEFINITIONS.find((team) => team.name === teamName) || null;
+}
+
+function sanitizeSelectionsPayload(teamDefinition, rawSelections) {
+  const validPlayerNames = new Set(teamDefinition.players.map((player) => player.name));
+  const selections = {};
+
+  for (const major of MAJOR_DEFINITIONS) {
+    const input = Array.isArray(rawSelections?.[major.key]) ? rawSelections[major.key] : [];
+    const seen = new Set();
+    const output = [];
+
+    for (const value of input) {
+      const playerName = String(value || '').trim();
+      if (!playerName || seen.has(playerName) || !validPlayerNames.has(playerName)) {
+        continue;
+      }
+
+      output.push(playerName);
+      seen.add(playerName);
+
+      if (output.length === 4) {
+        break;
+      }
+    }
+
+    selections[major.key] = output;
+  }
+
+  return selections;
+}
+
+async function fetchStoredSelections(seasonYear) {
+  const supabaseConfig = getSupabaseConfig();
+  if (!supabaseConfig) {
+    return {
+      rows: [],
+      configured: false
+    };
+  }
+
+  const params = new URLSearchParams({
+    season_year: `eq.${seasonYear}`,
+    select: 'team_name,selections,season_year,updated_at'
+  });
+
+  const response = await fetch(`${supabaseConfig.url}/rest/v1/team_selections?${params.toString()}`, {
+    headers: getSupabaseHeaders(supabaseConfig)
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Supabase read failed (${response.status}): ${detail}`);
+  }
+
+  const rows = await response.json();
+  return {
+    rows: Array.isArray(rows) ? rows : [],
+    configured: true
+  };
+}
+
+async function upsertSelections(seasonYear, teamName, rawSelections) {
+  const supabaseConfig = getSupabaseConfig();
+  if (!supabaseConfig) {
+    throw new Error('Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY).');
+  }
+
+  const teamDefinition = getTeamDefinition(teamName);
+  if (!teamDefinition) {
+    throw new Error(`Unknown team: ${teamName}`);
+  }
+
+  const selections = sanitizeSelectionsPayload(teamDefinition, rawSelections);
+
+  const response = await fetch(
+    `${supabaseConfig.url}/rest/v1/team_selections?on_conflict=season_year,team_name`,
+    {
+      method: 'POST',
+      headers: {
+        ...getSupabaseHeaders(supabaseConfig),
+        Prefer: 'resolution=merge-duplicates,return=representation'
+      },
+      body: JSON.stringify([
+        {
+          season_year: seasonYear,
+          team_name: teamName,
+          selections
+        }
+      ])
+    }
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Supabase write failed (${response.status}): ${detail}`);
+  }
+
+  const rows = await response.json();
+  return rows?.[0] || null;
+}
+
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      if (!body.trim()) {
+        resolve({});
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(body));
+      } catch (error) {
+        reject(new Error('Invalid JSON body.'));
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
 async function fetchMajorScoreMap(majorEvent) {
@@ -478,6 +625,54 @@ const server = http.createServer(async (req, res) => {
         'Cache-Control': 'no-store'
       });
       res.end(JSON.stringify(payload));
+      return;
+    }
+
+    if (url.pathname === '/api/selections') {
+      const seasonYear = parseSeasonYear(url.searchParams.get('year'));
+
+      if (req.method === 'GET') {
+        const result = await fetchStoredSelections(seasonYear);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(
+          JSON.stringify({
+            seasonYear,
+            configured: result.configured,
+            rows: result.rows
+          })
+        );
+        return;
+      }
+
+      if (req.method === 'POST') {
+        const body = await readJsonBody(req);
+        const bodySeasonYear = parseSeasonYear(body?.seasonYear);
+        const teamName = String(body?.teamName || '').trim();
+        const selections = body?.selections || {};
+
+        if (!teamName) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ error: 'teamName is required.' }));
+          return;
+        }
+
+        const saved = await upsertSelections(bodySeasonYear, teamName, selections);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(
+          JSON.stringify({
+            seasonYear: bodySeasonYear,
+            teamName,
+            saved
+          })
+        );
+        return;
+      }
+
+      res.writeHead(405, {
+        'Content-Type': 'application/json; charset=utf-8',
+        Allow: 'GET, POST'
+      });
+      res.end(JSON.stringify({ error: 'Method Not Allowed' }));
       return;
     }
 
