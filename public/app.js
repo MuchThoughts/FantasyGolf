@@ -4,11 +4,29 @@ const subtitleNode = document.getElementById('subtitle');
 const updatedAtNode = document.getElementById('updated-at');
 const refreshButton = document.getElementById('refresh');
 const yearToggleNode = document.getElementById('year-toggle');
+const leagueToggleNode = document.getElementById('league-toggle');
+const newLeagueButton = document.getElementById('new-league');
+const leagueModal = document.getElementById('league-modal');
+const closeLeagueModalButton = document.getElementById('close-league-modal');
+const leagueForm = document.getElementById('league-form');
+const leagueNameInput = document.getElementById('league-name-input');
+const addLeagueUserButton = document.getElementById('add-league-user');
+const leagueUsersList = document.getElementById('league-users-list');
+const leagueFormStatus = document.getElementById('league-form-status');
+
+const DEFAULT_LEAGUE_NAME = 'Davidson';
 
 let currentPayload = null;
 let teamUiState = {};
 let activeTab = 'season';
 let selectedSeasonYear = 2025;
+let selectedLeagueName = DEFAULT_LEAGUE_NAME;
+let availableLeagues = [];
+let leagueLimits = {
+  maxUsers: 20,
+  minPlayersPerUser: 4,
+  maxPlayersPerUser: 8
+};
 
 function normalizePlayerName(name) {
   if (!name) {
@@ -91,6 +109,22 @@ function toFriendlyDate(value) {
   }).format(date);
 }
 
+function getSeasonTabLabel() {
+  return 'Season Summary';
+}
+
+function getMajorByKey(majorKey) {
+  return (currentPayload?.majors || []).find((major) => major.key === majorKey) || null;
+}
+
+function getMajorName(majorKey) {
+  return getMajorByKey(majorKey)?.name || majorKey;
+}
+
+function getTeamByName(teamName) {
+  return (currentPayload?.teams || []).find((team) => team.name === teamName) || null;
+}
+
 function syncYearToggle(payload) {
   if (!yearToggleNode) {
     return;
@@ -108,6 +142,29 @@ function syncYearToggle(payload) {
   yearToggleNode.value = String(selectedSeasonYear);
 }
 
+function syncLeagueToggle() {
+  if (!leagueToggleNode) {
+    return;
+  }
+
+  const leagueNames = availableLeagues.map((league) => league.name);
+  if (!leagueNames.length) {
+    leagueToggleNode.innerHTML = `<option value="${DEFAULT_LEAGUE_NAME}">${DEFAULT_LEAGUE_NAME}</option>`;
+    selectedLeagueName = DEFAULT_LEAGUE_NAME;
+    leagueToggleNode.value = selectedLeagueName;
+    return;
+  }
+
+  if (!leagueNames.some((name) => name === selectedLeagueName)) {
+    selectedLeagueName = leagueNames[0];
+  }
+
+  leagueToggleNode.innerHTML = leagueNames
+    .map((name) => `<option value="${name}">${name}</option>`)
+    .join('');
+  leagueToggleNode.value = selectedLeagueName;
+}
+
 function makeEmptySelections(majors) {
   const selections = {};
   for (const major of majors) {
@@ -118,10 +175,6 @@ function makeEmptySelections(majors) {
 
 function hasAnySelections(selections, majors) {
   return (majors || []).some((major) => (selections?.[major.key]?.size || 0) > 0);
-}
-
-function getTeamByName(teamName) {
-  return (currentPayload?.teams || []).find((team) => team.name === teamName) || null;
 }
 
 function serializeSelectionsForApi(team, selections, majors) {
@@ -187,6 +240,29 @@ function buildSelectionsFromSavedRow(team, majors, rawSelections) {
   return selections;
 }
 
+function initializeTeamState(payload) {
+  teamUiState = {};
+  for (const team of payload.teams || []) {
+    teamUiState[team.name] = {
+      editing: false,
+      hasSavedSelection: false,
+      selections: makeEmptySelections(payload.majors || [])
+    };
+  }
+}
+
+function ensureTeamState(teamName) {
+  if (!teamUiState[teamName]) {
+    teamUiState[teamName] = {
+      editing: false,
+      hasSavedSelection: false,
+      selections: makeEmptySelections(currentPayload?.majors || [])
+    };
+  }
+
+  return teamUiState[teamName];
+}
+
 function hydrateSavedSelections(payload, rows) {
   const rowsByTeamName = new Map();
   for (const row of rows || []) {
@@ -209,8 +285,12 @@ function hydrateSavedSelections(payload, rows) {
   }
 }
 
-async function fetchSavedSelectionsForSeason(seasonYear) {
-  const response = await fetch(`/api/selections?year=${seasonYear}`);
+async function fetchSavedSelectionsForSeason(seasonYear, leagueName) {
+  const params = new URLSearchParams({
+    year: String(seasonYear),
+    league: leagueName
+  });
+  const response = await fetch(`/api/selections?${params.toString()}`);
 
   let responseBody = null;
   try {
@@ -226,6 +306,7 @@ async function fetchSavedSelectionsForSeason(seasonYear) {
 
   return {
     configured: responseBody?.configured !== false,
+    storageReady: responseBody?.storageReady !== false,
     rows: Array.isArray(responseBody?.rows) ? responseBody.rows : []
   };
 }
@@ -238,6 +319,7 @@ async function persistTeamSelections(teamName, selections) {
 
   const body = {
     seasonYear: selectedSeasonYear,
+    leagueName: selectedLeagueName,
     teamName,
     selections: serializeSelectionsForApi(team, selections, currentPayload.majors || [])
   };
@@ -265,35 +347,204 @@ async function persistTeamSelections(teamName, selections) {
   return responseBody;
 }
 
-function initializeTeamState(payload) {
-  teamUiState = {};
-  for (const team of payload.teams || []) {
-    teamUiState[team.name] = {
-      editing: false,
-      hasSavedSelection: false,
-      selections: makeEmptySelections(payload.majors || [])
-    };
-  }
-}
+async function loadLeagues(preferredLeagueName = selectedLeagueName) {
+  const response = await fetch('/api/leagues');
 
-function ensureTeamState(teamName) {
-  if (!teamUiState[teamName]) {
-    teamUiState[teamName] = {
-      editing: false,
-      hasSavedSelection: false,
-      selections: makeEmptySelections(currentPayload?.majors || [])
-    };
+  let responseBody = null;
+  try {
+    responseBody = await response.json();
+  } catch (error) {
+    responseBody = null;
   }
 
-  return teamUiState[teamName];
+  if (!response.ok) {
+    const message = responseBody?.detail || responseBody?.error || `Request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  availableLeagues = Array.isArray(responseBody?.leagues) ? responseBody.leagues : [];
+  if (responseBody?.limits) {
+    leagueLimits = responseBody.limits;
+  }
+
+  if (preferredLeagueName && availableLeagues.some((league) => league.name === preferredLeagueName)) {
+    selectedLeagueName = preferredLeagueName;
+  } else if (availableLeagues.length) {
+    selectedLeagueName = availableLeagues[0].name;
+  } else {
+    selectedLeagueName = DEFAULT_LEAGUE_NAME;
+  }
+
+  syncLeagueToggle();
 }
 
-function getMajorByKey(majorKey) {
-  return (currentPayload?.majors || []).find((major) => major.key === majorKey) || null;
+function createLeagueUserRow(initialUser = null) {
+  const row = document.createElement('div');
+  row.className = 'league-user-row';
+
+  const userName = initialUser?.name || '';
+  const playerLines = Array.isArray(initialUser?.players) ? initialUser.players.join('\n') : '';
+
+  row.innerHTML = `
+    <div class="league-user-row-top">
+      <input
+        type="text"
+        class="league-user-name"
+        maxlength="80"
+        placeholder="User name"
+        value="${userName}"
+      />
+      <button type="button" class="ghost-button remove-league-user">Remove</button>
+    </div>
+    <textarea
+      class="league-user-players"
+      rows="4"
+      placeholder="One golfer per line"
+    >${playerLines}</textarea>
+  `;
+
+  return row;
 }
 
-function getMajorName(majorKey) {
-  return getMajorByKey(majorKey)?.name || majorKey;
+function resetLeagueForm() {
+  leagueNameInput.value = '';
+  leagueFormStatus.textContent = '';
+  leagueUsersList.innerHTML = '';
+  leagueUsersList.appendChild(createLeagueUserRow());
+  leagueUsersList.appendChild(createLeagueUserRow());
+}
+
+function openLeagueModal() {
+  if (!leagueModal) {
+    return;
+  }
+  resetLeagueForm();
+  leagueModal.classList.remove('hidden');
+}
+
+function closeLeagueModal() {
+  if (!leagueModal) {
+    return;
+  }
+  leagueModal.classList.add('hidden');
+}
+
+function addLeagueUserRow() {
+  const currentCount = leagueUsersList.querySelectorAll('.league-user-row').length;
+  if (currentCount >= leagueLimits.maxUsers) {
+    leagueFormStatus.textContent = `You can add up to ${leagueLimits.maxUsers} users per league.`;
+    return;
+  }
+
+  leagueUsersList.appendChild(createLeagueUserRow());
+  leagueFormStatus.textContent = '';
+}
+
+function collectLeagueUsersFromForm() {
+  const rows = Array.from(leagueUsersList.querySelectorAll('.league-user-row'));
+  if (!rows.length) {
+    throw new Error('Add at least one user.');
+  }
+
+  if (rows.length > leagueLimits.maxUsers) {
+    throw new Error(`You can add up to ${leagueLimits.maxUsers} users per league.`);
+  }
+
+  const users = [];
+  const seenUserNames = new Set();
+
+  for (const [index, row] of rows.entries()) {
+    const userNameInput = row.querySelector('.league-user-name');
+    const playersInput = row.querySelector('.league-user-players');
+    const userName = String(userNameInput?.value || '').trim();
+
+    if (!userName) {
+      throw new Error(`User ${index + 1} is missing a name.`);
+    }
+
+    const normalizedUserName = normalizePlayerName(userName);
+    if (seenUserNames.has(normalizedUserName)) {
+      throw new Error(`Duplicate user name: ${userName}`);
+    }
+    seenUserNames.add(normalizedUserName);
+
+    const players = String(playersInput?.value || '')
+      .split('\n')
+      .map((name) => name.trim())
+      .filter(Boolean);
+
+    const uniquePlayers = [];
+    const seenPlayers = new Set();
+    for (const player of players) {
+      const normalizedPlayer = normalizePlayerName(player);
+      if (seenPlayers.has(normalizedPlayer)) {
+        continue;
+      }
+      seenPlayers.add(normalizedPlayer);
+      uniquePlayers.push(player);
+    }
+
+    if (uniquePlayers.length < leagueLimits.minPlayersPerUser || uniquePlayers.length > leagueLimits.maxPlayersPerUser) {
+      throw new Error(
+        `${userName} must have ${leagueLimits.minPlayersPerUser}-${leagueLimits.maxPlayersPerUser} golfers.`
+      );
+    }
+
+    users.push({
+      name: userName,
+      players: uniquePlayers
+    });
+  }
+
+  return users;
+}
+
+async function createLeagueFromForm(event) {
+  event.preventDefault();
+  leagueFormStatus.textContent = '';
+
+  const leagueName = String(leagueNameInput.value || '').trim();
+  if (!leagueName) {
+    leagueFormStatus.textContent = 'League name is required.';
+    return;
+  }
+
+  let users = [];
+  try {
+    users = collectLeagueUsersFromForm();
+  } catch (error) {
+    leagueFormStatus.textContent = error.message;
+    return;
+  }
+
+  leagueFormStatus.textContent = 'Saving league...';
+
+  try {
+    const response = await fetch('/api/leagues', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: leagueName,
+        users
+      })
+    });
+
+    const responseBody = await response.json();
+    if (!response.ok) {
+      throw new Error(responseBody?.detail || responseBody?.error || `Request failed with status ${response.status}`);
+    }
+
+    const savedLeagueName = responseBody?.league?.name || leagueName;
+    await loadLeagues(savedLeagueName);
+    selectedLeagueName = savedLeagueName;
+    closeLeagueModal();
+    await loadData(false);
+    statusNode.textContent = `Created league ${savedLeagueName}.`;
+  } catch (error) {
+    leagueFormStatus.textContent = error.message;
+  }
 }
 
 function computeTop3FromSelections(team, majors, selections) {
@@ -343,10 +594,6 @@ function computeTop3FromSelections(team, majors, selections) {
   };
 }
 
-function getSeasonTabLabel() {
-  return 'Season Summary';
-}
-
 function ensureValidActiveTab(payload) {
   const allowedTabs = ['season', ...(payload.majors || []).map((major) => major.key)];
   if (!allowedTabs.includes(activeTab)) {
@@ -375,7 +622,7 @@ function buildSeasonView(payload) {
   const teams = payload.teams || [];
 
   if (!teams.length) {
-    return '<p class="status">No teams found.</p>';
+    return '<p class="status">No users found in this league.</p>';
   }
 
   const cards = teams.map((team) => {
@@ -621,13 +868,13 @@ function buildMajorScoreboardView(payload, majorKey) {
   return `
     <section class="major-board">
       <h3>${major.name} Scoreboard</h3>
-      <p class="major-subtitle">Compares each team's saved 4-player picks for this major. Top 3 is the best three scores from the four picks.</p>
+      <p class="major-subtitle">Compares each user's saved 4-player picks for this major. Top 3 is the best three scores from the four picks.</p>
       <div class="table-wrap">
         <table class="major-scoreboard-table">
           <thead>
             <tr>
               <th scope="col">Rank</th>
-              <th scope="col">Team</th>
+              <th scope="col">User</th>
               <th scope="col">Pick 1</th>
               <th scope="col">Pick 2</th>
               <th scope="col">Pick 3</th>
@@ -663,11 +910,11 @@ function setDefaultStatusForTab() {
   }
 
   if (activeTab === 'season') {
-    statusNode.textContent = `Viewing ${selectedSeasonYear} data. Click Edit on any table to choose up to 4 players per major.`;
+    statusNode.textContent = `Viewing ${selectedLeagueName} (${selectedSeasonYear}) data. Click Edit on any user table to choose up to 4 players per major.`;
     return;
   }
 
-  statusNode.textContent = `Viewing ${selectedSeasonYear} ${getMajorName(activeTab)} scoreboard with each team's saved picks.`;
+  statusNode.textContent = `Viewing ${selectedLeagueName} ${selectedSeasonYear} ${getMajorName(activeTab)} scoreboard with each user's saved picks.`;
 }
 
 function onContainerClick(event) {
@@ -692,23 +939,23 @@ function onContainerClick(event) {
     state.hasSavedSelection = hasAnySelections(state.selections, currentPayload.majors || []);
     renderApp(currentPayload);
 
-    statusNode.textContent = `Saving selections for ${teamName}...`;
+    statusNode.textContent = `Saving selections for ${teamName} in ${selectedLeagueName}...`;
     persistTeamSelections(teamName, state.selections)
       .then(() => {
-        statusNode.textContent = `Saved selections for ${teamName} (${selectedSeasonYear}).`;
+        statusNode.textContent = `Saved selections for ${teamName} (${selectedLeagueName}, ${selectedSeasonYear}).`;
       })
       .catch((error) => {
         statusNode.textContent = `Saved locally for ${teamName}, but Supabase sync failed: ${error.message}`;
       });
     return;
-  } else {
-    activeTab = 'season';
-    state.editing = true;
-    if (!state.hasSavedSelection) {
-      state.selections = makeEmptySelections(currentPayload.majors || []);
-    }
-    statusNode.textContent = `Editing ${teamName}: choose up to 4 players per major.`;
   }
+
+  activeTab = 'season';
+  state.editing = true;
+  if (!state.hasSavedSelection) {
+    state.selections = makeEmptySelections(currentPayload.majors || []);
+  }
+  statusNode.textContent = `Editing ${teamName}: choose up to 4 players per major.`;
 
   renderApp(currentPayload);
 }
@@ -748,11 +995,12 @@ function onSelectionChange(event) {
 }
 
 async function loadData(forceRefresh = false) {
-  statusNode.textContent = 'Loading team tables from ESPN data...';
+  statusNode.textContent = `Loading ${selectedLeagueName} league data...`;
 
   try {
     const params = new URLSearchParams({
-      year: String(selectedSeasonYear)
+      year: String(selectedSeasonYear),
+      league: selectedLeagueName
     });
     if (forceRefresh) {
       params.set('refresh', '1');
@@ -765,17 +1013,21 @@ async function loadData(forceRefresh = false) {
 
     currentPayload = await response.json();
     selectedSeasonYear = Number.parseInt(String(currentPayload?.seasonYear || selectedSeasonYear), 10);
+    selectedLeagueName = String(currentPayload?.leagueName || selectedLeagueName);
     activeTab = 'season';
     syncYearToggle(currentPayload);
+    syncLeagueToggle();
     initializeTeamState(currentPayload);
 
     let selectionsStatusNote = '';
     try {
-      const selectionsPayload = await fetchSavedSelectionsForSeason(selectedSeasonYear);
-      if (selectionsPayload.configured) {
+      const selectionsPayload = await fetchSavedSelectionsForSeason(selectedSeasonYear, selectedLeagueName);
+      if (selectionsPayload.configured && selectionsPayload.storageReady) {
         hydrateSavedSelections(currentPayload, selectionsPayload.rows);
-      } else {
+      } else if (!selectionsPayload.configured) {
         selectionsStatusNote = 'Supabase is not configured yet, so picks are not being persisted.';
+      } else {
+        selectionsStatusNote = 'Selections table is not set up yet. Run the latest Supabase SQL.';
       }
     } catch (error) {
       selectionsStatusNote = `Could not load saved picks: ${error.message}`;
@@ -783,7 +1035,7 @@ async function loadData(forceRefresh = false) {
 
     renderApp(currentPayload);
 
-    subtitleNode.textContent = `${getSeasonTabLabel()} for ${selectedSeasonYear} with tabbed major scoreboards.`;
+    subtitleNode.textContent = `${getSeasonTabLabel()} for ${selectedLeagueName} (${selectedSeasonYear}) with tabbed major scoreboards.`;
     updatedAtNode.textContent = `Updated ${toFriendlyDate(currentPayload.updatedAt)}`;
     setDefaultStatusForTab();
     if (selectionsStatusNote) {
@@ -793,6 +1045,19 @@ async function loadData(forceRefresh = false) {
     statusNode.textContent = `Error loading data: ${error.message}`;
     teamsContainer.innerHTML = '<p class="status">Unable to load data.</p>';
   }
+}
+
+async function initializeApp() {
+  try {
+    await loadLeagues(selectedLeagueName);
+  } catch (error) {
+    statusNode.textContent = `Could not load leagues: ${error.message}`;
+    availableLeagues = [{ name: DEFAULT_LEAGUE_NAME }];
+    selectedLeagueName = DEFAULT_LEAGUE_NAME;
+    syncLeagueToggle();
+  }
+
+  await loadData(false);
 }
 
 teamsContainer.addEventListener('click', onContainerClick);
@@ -813,4 +1078,58 @@ if (yearToggleNode) {
   });
 }
 
-loadData();
+if (leagueToggleNode) {
+  leagueToggleNode.addEventListener('change', (event) => {
+    const target = event.target;
+    const leagueName = String(target.value || '').trim();
+    if (leagueName) {
+      selectedLeagueName = leagueName;
+      loadData(false);
+    }
+  });
+}
+
+if (newLeagueButton) {
+  newLeagueButton.addEventListener('click', openLeagueModal);
+}
+
+if (closeLeagueModalButton) {
+  closeLeagueModalButton.addEventListener('click', closeLeagueModal);
+}
+
+if (leagueModal) {
+  leagueModal.addEventListener('click', (event) => {
+    if (event.target === leagueModal) {
+      closeLeagueModal();
+    }
+  });
+}
+
+if (addLeagueUserButton) {
+  addLeagueUserButton.addEventListener('click', addLeagueUserRow);
+}
+
+if (leagueUsersList) {
+  leagueUsersList.addEventListener('click', (event) => {
+    const removeButton = event.target.closest('.remove-league-user');
+    if (!removeButton) {
+      return;
+    }
+
+    const row = removeButton.closest('.league-user-row');
+    if (!row) {
+      return;
+    }
+
+    row.remove();
+    if (!leagueUsersList.querySelector('.league-user-row')) {
+      addLeagueUserRow();
+    }
+  });
+}
+
+if (leagueForm) {
+  leagueForm.addEventListener('submit', createLeagueFromForm);
+}
+
+initializeApp();

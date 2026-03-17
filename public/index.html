@@ -13,6 +13,11 @@
         <h1 id="app-title">Fantasy Golf Majors</h1>
         <p id="subtitle" class="subtitle">Loading latest data...</p>
         <div class="actions">
+          <label class="league-toggle-wrap" for="league-toggle">
+            <span>League</span>
+            <select id="league-toggle" aria-label="Select league"></select>
+          </label>
+          <button id="new-league" type="button" class="secondary-button">New League</button>
           <label class="year-toggle-wrap" for="year-toggle">
             <span>Season</span>
             <select id="year-toggle" aria-label="Select season year">
@@ -29,6 +34,31 @@
 
       <p id="status" class="status">Loading...</p>
     </main>
+
+    <div id="league-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="league-modal-title">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h2 id="league-modal-title">Create League</h2>
+          <button id="close-league-modal" type="button" class="ghost-button">Close</button>
+        </div>
+        <form id="league-form" class="league-form">
+          <label class="field">
+            <span>League Name</span>
+            <input id="league-name-input" type="text" maxlength="80" placeholder="League name" required />
+          </label>
+          <div class="league-users-head">
+            <h3>Users</h3>
+            <button id="add-league-user" type="button" class="secondary-button">Add User</button>
+          </div>
+          <p class="footnote">Each user needs 4-8 golfers (one golfer per line).</p>
+          <div id="league-users-list" class="league-users-list"></div>
+          <div class="modal-actions">
+            <button type="submit">Save League</button>
+          </div>
+          <p id="league-form-status" class="status modal-status"></p>
+        </form>
+      </div>
+    </div>
 
     <script src="/app.js"></script>
   </body>

@@ -64,7 +64,8 @@ h1 {
   margin-top: 1rem;
 }
 
-.year-toggle-wrap {
+.year-toggle-wrap,
+.league-toggle-wrap {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -77,13 +78,15 @@ h1 {
   font-weight: 600;
 }
 
-.year-toggle-wrap select {
+.year-toggle-wrap select,
+.league-toggle-wrap select {
   border: 1px solid #cfd9da;
   border-radius: 999px;
   background: #ffffff;
   color: #243136;
   font-size: 0.84rem;
   padding: 0.2rem 0.55rem;
+  min-width: 130px;
 }
 
 button {
@@ -98,6 +101,18 @@ button {
 
 button:hover {
   opacity: 0.9;
+}
+
+.secondary-button {
+  background: #e9eeee;
+  color: #2b3336;
+  border: 1px solid #d0d8d9;
+}
+
+.ghost-button {
+  background: transparent;
+  color: #2f3a3f;
+  border: 1px solid #d0d8d9;
 }
 
 .updated-at {
@@ -319,6 +334,126 @@ tbody tr:hover {
   margin-top: 0.9rem;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 28, 31, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-card {
+  width: min(920px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 1rem;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.league-form {
+  margin-top: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: #3a474c;
+}
+
+.field input {
+  border: 1px solid #cdd7d8;
+  border-radius: 10px;
+  font-size: 0.94rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.league-users-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.league-users-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.league-users-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.league-user-row {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.65rem;
+  background: #f8fbfb;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.league-user-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.league-user-row-top input {
+  flex: 1;
+  border: 1px solid #cdd7d8;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  padding: 0.45rem 0.6rem;
+}
+
+.league-user-row textarea {
+  width: 100%;
+  border: 1px solid #cdd7d8;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  padding: 0.5rem 0.6rem;
+  resize: vertical;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modal-status {
+  margin-top: 0;
 }
 
 @media (max-width: 700px) {
