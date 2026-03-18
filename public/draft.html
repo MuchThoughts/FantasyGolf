@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fantasy Golf Majors Draft</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero draft-hero">
+        <p class="eyebrow">Snake Draft</p>
+        <h1>Fantasy Golf Majors Draft</h1>
+        <p id="draft-subtitle" class="subtitle">Loading draft board...</p>
+        <div class="actions">
+          <a href="/" class="ghost-link-button">Back to Summary</a>
+          <p id="draft-meta" class="updated-at"></p>
+        </div>
+      </header>
+
+      <p id="draft-status" class="status">Preparing draft...</p>
+
+      <section class="draft-layout">
+        <article class="draft-pane">
+          <div class="draft-pane-head">
+            <h2 id="on-clock">On the clock</h2>
+            <p id="pick-counter" class="footnote"></p>
+          </div>
+          <div id="team-board" class="draft-team-board"></div>
+        </article>
+
+        <article class="draft-pane">
+          <div class="draft-pane-head draft-pane-head-stack">
+            <h2>Available Players</h2>
+            <label class="draft-search" for="player-search">
+              <span>Search</span>
+              <input id="player-search" type="search" placeholder="Find a player" autocomplete="off" />
+            </label>
+          </div>
+          <div class="table-wrap">
+            <table id="available-table" class="draft-players-table">
+              <thead>
+                <tr>
+                  <th scope="col">Rank</th>
+                  <th scope="col">Player</th>
+                  <th scope="col">Masters</th>
+                  <th scope="col">PGA</th>
+                  <th scope="col">U.S. Open</th>
+                  <th scope="col">The Open</th>
+                  <th scope="col">Overall</th>
+                  <th scope="col">Draft</th>
+                </tr>
+              </thead>
+              <tbody id="available-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="draft-order-wrap">
+        <h3>Draft Order (Snake)</h3>
+        <div id="draft-order" class="draft-order"></div>
+      </section>
+
+      <div class="draft-actions">
+        <button id="save-draft" type="button" disabled>Save League</button>
+      </div>
+    </main>
+
+    <script src="/draft.js"></script>
+  </body>
+</html>

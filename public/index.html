@@ -47,11 +47,28 @@
             <span>League Name</span>
             <input id="league-name-input" type="text" maxlength="80" placeholder="League name" required />
           </label>
+          <label class="field">
+            <span>Setup Mode</span>
+            <select id="league-mode-select">
+              <option value="selected">Enter already selected players</option>
+              <option value="draft">Run a snake draft</option>
+            </select>
+          </label>
+          <label id="draft-rounds-wrap" class="field hidden-field">
+            <span>Draft Rounds (Players per User)</span>
+            <select id="draft-rounds-select">
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+              <option value="8">8</option>
+            </select>
+          </label>
           <div class="league-users-head">
             <h3>Users</h3>
             <button id="add-league-user" type="button" class="secondary-button">Add User</button>
           </div>
-          <p class="footnote">Each user needs 4-8 golfers. Start with 4 and click + Player to add more.</p>
+          <p id="league-form-hint" class="footnote">Each user needs 4-8 golfers. Start with 4 and click + Player to add more.</p>
           <div id="league-users-list" class="league-users-list"></div>
           <div class="modal-actions">
             <button type="submit">Save League</button>

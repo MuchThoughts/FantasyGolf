@@ -5,8 +5,20 @@
       "destination": "/public/index.html"
     },
     {
+      "source": "/draft",
+      "destination": "/public/draft.html"
+    },
+    {
+      "source": "/draft.html",
+      "destination": "/public/draft.html"
+    },
+    {
       "source": "/app.js",
       "destination": "/public/app.js"
+    },
+    {
+      "source": "/draft.js",
+      "destination": "/public/draft.js"
     },
     {
       "source": "/styles.css",

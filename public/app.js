@@ -15,14 +15,21 @@ const addLeagueUserButton = document.getElementById('add-league-user');
 const leagueUsersList = document.getElementById('league-users-list');
 const leagueFormStatus = document.getElementById('league-form-status');
 const playerOptionsNode = document.getElementById('player-options');
+const leagueModeSelect = document.getElementById('league-mode-select');
+const draftRoundsWrap = document.getElementById('draft-rounds-wrap');
+const draftRoundsSelect = document.getElementById('draft-rounds-select');
+const leagueFormHint = document.getElementById('league-form-hint');
 
 const DEFAULT_LEAGUE_NAME = 'Davidson';
+const DRAFT_SETUP_STORAGE_KEY = 'fantasyGolfDraftSetup';
+const DRAFT_SEASON_YEAR = 2025;
 
 let currentPayload = null;
 let teamUiState = {};
 let activeTab = 'season';
 let selectedSeasonYear = 2025;
 let selectedLeagueName = DEFAULT_LEAGUE_NAME;
+let currentLeagueSetupMode = 'selected';
 let availableLeagues = [];
 let leagueLimits = {
   maxUsers: 20,
@@ -32,6 +39,21 @@ let leagueLimits = {
 let topPlayers = [];
 let topPlayersSeasonYear = null;
 const topPlayerByNormalizedName = new Map();
+
+try {
+  const initialParams = new URLSearchParams(window.location.search || '');
+  const requestedLeague = String(initialParams.get('league') || '').trim();
+  const requestedYear = Number.parseInt(String(initialParams.get('year') || ''), 10);
+
+  if (requestedLeague) {
+    selectedLeagueName = requestedLeague;
+  }
+  if (!Number.isNaN(requestedYear)) {
+    selectedSeasonYear = requestedYear;
+  }
+} catch (error) {
+  // Ignore invalid URL parsing and keep defaults.
+}
 
 function normalizePlayerName(name) {
   if (!name) {
@@ -544,9 +566,49 @@ function createLeagueUserRow(initialUser = null) {
   return row;
 }
 
+function getLeagueSetupMode() {
+  const mode = String(leagueModeSelect?.value || 'selected').trim().toLowerCase();
+  return mode === 'draft' ? 'draft' : 'selected';
+}
+
+function updateLeagueSetupModeUi(mode = getLeagueSetupMode()) {
+  currentLeagueSetupMode = mode;
+  const isDraft = mode === 'draft';
+
+  if (leagueForm) {
+    leagueForm.dataset.setupMode = mode;
+  }
+
+  if (leagueUsersList) {
+    leagueUsersList.classList.toggle('is-draft-mode', isDraft);
+  }
+
+  if (draftRoundsWrap) {
+    draftRoundsWrap.classList.toggle('hidden-field', !isDraft);
+  }
+
+  if (leagueFormHint) {
+    leagueFormHint.textContent = isDraft
+      ? 'Enter user names, pick 4-8 rounds, then continue to the snake draft board.'
+      : 'Each user needs 4-8 golfers. Start with 4 and click + Player to add more.';
+  }
+
+  const submitButton = leagueForm?.querySelector('button[type="submit"]');
+  if (submitButton) {
+    submitButton.textContent = isDraft ? 'Continue to Draft' : 'Save League';
+  }
+}
+
 function resetLeagueForm() {
   leagueNameInput.value = '';
   leagueFormStatus.textContent = '';
+  if (leagueModeSelect) {
+    leagueModeSelect.value = 'selected';
+  }
+  if (draftRoundsSelect) {
+    draftRoundsSelect.value = String(leagueLimits.minPlayersPerUser);
+  }
+  updateLeagueSetupModeUi('selected');
   leagueUsersList.innerHTML = '';
   leagueUsersList.appendChild(createLeagueUserRow());
   leagueUsersList.appendChild(createLeagueUserRow());
@@ -588,6 +650,16 @@ function addLeagueUserRow() {
 }
 
 function validateLeaguePlayerAssignments(showStatus = false) {
+  if (currentLeagueSetupMode === 'draft') {
+    if (showStatus) {
+      leagueFormStatus.textContent = '';
+    }
+    return {
+      ok: true,
+      message: ''
+    };
+  }
+
   const playerInputs = Array.from(leagueUsersList.querySelectorAll('.league-player-input'));
   for (const input of playerInputs) {
     input.setCustomValidity('');
@@ -737,13 +809,85 @@ function collectLeagueUsersFromForm() {
   return users;
 }
 
+function collectLeagueUsersForDraft() {
+  const rows = getLeagueUserRows();
+  if (!rows.length) {
+    throw new Error("Add at least one user.");
+  }
+
+  if (rows.length > leagueLimits.maxUsers) {
+    throw new Error("You can add up to " + leagueLimits.maxUsers + " users per league.");
+  }
+
+  const users = [];
+  const seenUserNames = new Set();
+
+  for (const [index, row] of rows.entries()) {
+    const userNameInput = row.querySelector(".league-user-name");
+    const userName = String(userNameInput?.value || "").trim();
+
+    if (!userName) {
+      throw new Error("User " + (index + 1) + " is missing a name.");
+    }
+
+    const normalizedUserName = normalizePlayerName(userName);
+    if (seenUserNames.has(normalizedUserName)) {
+      throw new Error("Duplicate user name: " + userName);
+    }
+    seenUserNames.add(normalizedUserName);
+
+    users.push({
+      name: userName
+    });
+  }
+
+  return users;
+}
+
+function startDraftFromForm(leagueName) {
+  const users = collectLeagueUsersForDraft();
+  const roundsInput = Number.parseInt(String(draftRoundsSelect?.value || leagueLimits.minPlayersPerUser), 10);
+  const rounds = Number.isNaN(roundsInput)
+    ? leagueLimits.minPlayersPerUser
+    : Math.max(leagueLimits.minPlayersPerUser, Math.min(leagueLimits.maxPlayersPerUser, roundsInput));
+
+  const draftSetup = {
+    leagueName,
+    seasonYear: DRAFT_SEASON_YEAR,
+    rounds,
+    users,
+    createdAt: new Date().toISOString()
+  };
+
+  try {
+    window.sessionStorage.setItem(DRAFT_SETUP_STORAGE_KEY, JSON.stringify(draftSetup));
+  } catch (error) {
+    throw new Error("Could not start draft because browser storage is blocked.");
+  }
+
+  closeLeagueModal();
+  window.location.href = "/draft.html";
+}
+
 async function createLeagueFromForm(event) {
   event.preventDefault();
-  leagueFormStatus.textContent = '';
+  leagueFormStatus.textContent = "";
 
-  const leagueName = String(leagueNameInput.value || '').trim();
+  const leagueName = String(leagueNameInput.value || "").trim();
   if (!leagueName) {
-    leagueFormStatus.textContent = 'League name is required.';
+    leagueFormStatus.textContent = "League name is required.";
+    return;
+  }
+
+  const setupMode = getLeagueSetupMode();
+  updateLeagueSetupModeUi(setupMode);
+
+  if (setupMode === "draft") {
+    try {
+      startDraftFromForm(leagueName);
+    } catch (error) {
+      leagueFormStatus.textContent = error.message;
+    }
     return;
   }
 
@@ -760,13 +904,13 @@ async function createLeagueFromForm(event) {
     return;
   }
 
-  leagueFormStatus.textContent = 'Saving league...';
+  leagueFormStatus.textContent = "Saving league...";
 
   try {
-    const response = await fetch('/api/leagues', {
-      method: 'POST',
+    const response = await fetch("/api/leagues", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         name: leagueName,
@@ -776,7 +920,7 @@ async function createLeagueFromForm(event) {
 
     const responseBody = await response.json();
     if (!response.ok) {
-      throw new Error(responseBody?.detail || responseBody?.error || `Request failed with status ${response.status}`);
+      throw new Error(responseBody?.detail || responseBody?.error || "Request failed with status " + response.status);
     }
 
     const savedLeagueName = responseBody?.league?.name || leagueName;
@@ -784,7 +928,7 @@ async function createLeagueFromForm(event) {
     selectedLeagueName = savedLeagueName;
     closeLeagueModal();
     await loadData(false);
-    statusNode.textContent = `Created league ${savedLeagueName}.`;
+    statusNode.textContent = "Created league " + savedLeagueName + ".";
   } catch (error) {
     leagueFormStatus.textContent = error.message;
   }
@@ -1395,6 +1539,23 @@ if (closeLeagueModalButton) {
   closeLeagueModalButton.addEventListener('click', closeLeagueModal);
 }
 
+if (leagueModeSelect) {
+  leagueModeSelect.addEventListener('change', (event) => {
+    const mode = String(event.target?.value || 'selected').trim().toLowerCase() === 'draft'
+      ? 'draft'
+      : 'selected';
+
+    updateLeagueSetupModeUi(mode);
+    leagueFormStatus.textContent = '';
+
+    if (mode === 'selected' && topPlayers.length === 0) {
+      ensureTopPlayersLoaded().catch((error) => {
+        leagueFormStatus.textContent = 'Could not load top players: ' + error.message;
+      });
+    }
+  });
+}
+
 if (leagueModal) {
   leagueModal.addEventListener('click', (event) => {
     if (event.target === leagueModal) {
@@ -1411,6 +1572,10 @@ if (leagueUsersList) {
   leagueUsersList.addEventListener('click', (event) => {
     const addPlayerButton = event.target.closest('.add-player-button');
     if (addPlayerButton) {
+      if (currentLeagueSetupMode === 'draft') {
+        return;
+      }
+
       const userRow = addPlayerButton.closest('.league-user-row');
       if (!userRow) {
         return;
@@ -1423,6 +1588,10 @@ if (leagueUsersList) {
 
     const removePlayerButton = event.target.closest('.remove-player-button');
     if (removePlayerButton) {
+      if (currentLeagueSetupMode === 'draft') {
+        return;
+      }
+
       const playerRow = removePlayerButton.closest('.league-player-row');
       const userRow = removePlayerButton.closest('.league-user-row');
       if (!playerRow || !userRow) {
@@ -1463,6 +1632,10 @@ if (leagueUsersList) {
       return;
     }
 
+    if (currentLeagueSetupMode === 'draft') {
+      return;
+    }
+
     const canonical = canonicalPlayerName(playerInput.value);
     if (canonical) {
       playerInput.value = canonical;
@@ -1473,6 +1646,10 @@ if (leagueUsersList) {
   leagueUsersList.addEventListener('input', (event) => {
     const playerInput = event.target.closest('.league-player-input');
     if (!playerInput) {
+      return;
+    }
+
+    if (currentLeagueSetupMode === 'draft') {
       return;
     }
 

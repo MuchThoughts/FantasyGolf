@@ -20,6 +20,8 @@ async function serveStaticFile(res, requestedPathname) {
   let pathname = requestedPathname;
   if (pathname === '/') {
     pathname = '/index.html';
+  } else if (pathname === '/draft') {
+    pathname = '/draft.html';
   }
 
   const absolutePath = path.normalize(path.join(PUBLIC_DIR, pathname));
@@ -174,6 +176,27 @@ const server = http.createServer(async (req, res) => {
       const seasonYear = core.parseSeasonYear(url.searchParams.get('year'));
       const forceRefresh = url.searchParams.get('refresh') === '1';
       const payload = await core.fetchTopPlayers(seasonYear, forceRefresh);
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store'
+      });
+      res.end(JSON.stringify(payload));
+      return;
+    }
+
+    if (url.pathname === '/api/draft-pool') {
+      if (req.method !== 'GET') {
+        res.writeHead(405, {
+          'Content-Type': 'application/json; charset=utf-8',
+          Allow: 'GET'
+        });
+        res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+        return;
+      }
+
+      const seasonYear = core.parseSeasonYear(url.searchParams.get('year'));
+      const forceRefresh = url.searchParams.get('refresh') === '1';
+      const payload = await core.fetchDraftPool(seasonYear, forceRefresh);
       res.writeHead(200, {
         'Content-Type': 'application/json; charset=utf-8',
         'Cache-Control': 'no-store'
