@@ -69,7 +69,7 @@ function normalizePlayerName(name) {
 }
 
 function scoreClass(score) {
-  if (score === null || score === undefined || score === 'N/A') {
+  if (score === null || score === undefined || score === '-') {
     return 'na';
   }
 
@@ -95,7 +95,7 @@ function parseScoreValue(scoreText) {
   }
 
   const value = String(scoreText).trim().replace('*', '');
-  if (!value || value === 'N/A') {
+  if (!value || value === '-') {
     return null;
   }
 
@@ -112,7 +112,7 @@ function parseScoreValue(scoreText) {
 
 function formatScoreValue(scoreValue, partial = false) {
   if (scoreValue === null || scoreValue === undefined || Number.isNaN(scoreValue)) {
-    return 'N/A';
+    return '-';
   }
 
   const base = scoreValue === 0 ? 'E' : scoreValue > 0 ? `+${scoreValue}` : `${scoreValue}`;
@@ -989,7 +989,7 @@ function computeTop3FromSelections(team, majors, selections) {
 
     if (bestThree.length === 0) {
       majorTotals[major.key] = {
-        display: 'N/A',
+        display: '-',
         value: null,
         partial: true
       };
@@ -1015,7 +1015,7 @@ function computeTop3FromSelections(team, majors, selections) {
 
   return {
     majorTotals,
-    overallDisplay: hasOverallValues ? formatScoreValue(overallSum, overallPartial) : 'N/A'
+    overallDisplay: hasOverallValues ? formatScoreValue(overallSum, overallPartial) : '-'
   };
 }
 
@@ -1061,7 +1061,7 @@ function buildSeasonView(payload) {
       ? computeTop3FromSelections(team, majors, state.selections)
       : {
           majorTotals: team.totals?.top3?.majorTotals || {},
-          overallDisplay: team.totals?.top3?.overall?.display || 'N/A'
+          overallDisplay: team.totals?.top3?.overall?.display || '-'
         };
 
     const bodyRows = team.players
@@ -1092,13 +1092,13 @@ function buildSeasonView(payload) {
               `;
             }
 
-            const score = player.majorScores?.[major.key] || 'N/A';
+            const score = player.majorScores?.[major.key] || '-';
             const muted = state.hasSavedSelection && !state.selections[major.key]?.has(playerIndex);
             return `<td class="score ${scoreClass(score)}${muted ? ' muted-score' : ''}">${score}</td>`;
           })
           .join('');
 
-        const overallScore = state.editing ? '—' : (player.overall || 'N/A');
+        const overallScore = state.editing ? '—' : (player.overall || '-');
         const overallMuted = !state.editing && state.hasSavedSelection && !anyMajorSelected;
 
         return `
@@ -1119,19 +1119,19 @@ function buildSeasonView(payload) {
     if (!state.editing) {
       totalRowCells = majors
         .map((major) => {
-          const display = team.totals?.majorTotals?.[major.key]?.display || 'N/A';
+          const display = team.totals?.majorTotals?.[major.key]?.display || '-';
           return `<td class="score ${scoreClass(display)}">${display}</td>`;
         })
         .join('');
-      totalOverall = team.totals?.overall?.display || 'N/A';
+      totalOverall = team.totals?.overall?.display || '-';
 
       top3RowCells = majors
         .map((major) => {
-          const display = top3DisplayData.majorTotals?.[major.key]?.display || 'N/A';
+          const display = top3DisplayData.majorTotals?.[major.key]?.display || '-';
           return `<td class="score ${scoreClass(display)}">${display}</td>`;
         })
         .join('');
-      top3Overall = top3DisplayData.overallDisplay || 'N/A';
+      top3Overall = top3DisplayData.overallDisplay || '-';
     } else {
       totalRowCells = majors.map(() => '<td class="score na">—</td>').join('');
       top3RowCells = majors.map(() => '<td class="score na">—</td>').join('');
@@ -1208,7 +1208,7 @@ function buildMajorScoreboardView(payload, majorKey) {
         };
       }
 
-      const scoreText = picked.player.majorScores?.[majorKey] || 'N/A';
+      const scoreText = picked.player.majorScores?.[majorKey] || '-';
       return {
         name: picked.player.name,
         scoreText,
@@ -1225,14 +1225,14 @@ function buildMajorScoreboardView(payload, majorKey) {
       : null;
     const selected4Partial = pickedPlayers.length < 4 || selectedScoreValues.length < pickedPlayers.length;
     const selected4Display = selected4Sum === null
-      ? 'N/A'
+      ? '-'
       : formatScoreValue(selected4Sum, selected4Partial);
 
     const top3Values = [...selectedScoreValues].sort((a, b) => a - b).slice(0, 3);
     const top3Sum = top3Values.length ? top3Values.reduce((sum, value) => sum + value, 0) : null;
     const top3Partial = top3Values.length < 3;
     const top3Display = top3Sum === null
-      ? 'N/A'
+      ? '-'
       : formatScoreValue(top3Sum, top3Partial);
 
     return {

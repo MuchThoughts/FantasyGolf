@@ -35,7 +35,7 @@ function normalizeName(name) {
 }
 
 function scoreClass(score) {
-  if (score === null || score === undefined || score === "N/A") {
+  if (score === null || score === undefined || score === "-") {
     return "na";
   }
 
@@ -222,7 +222,7 @@ function buildTeamCard(team, currentTurn) {
       continue;
     }
 
-    picksMarkup += "<li class=\"team-pick\">Pick " + (index + 1) + ": <strong>" + player.name + "</strong> <span class=\"score " + scoreClass(player.overall) + "\">" + (player.overall || "N/A") + "</span></li>";
+    picksMarkup += "<li class=\"team-pick\">Pick " + (index + 1) + ": <strong>" + player.name + "</strong> <span class=\"score " + scoreClass(player.overall) + "\">" + (player.overall || "-") + "</span></li>";
   }
 
   const isOnClock = currentTurn && currentTurn.userName === team.name;
@@ -247,11 +247,11 @@ function renderAvailablePlayers() {
   const disabled = isDraftComplete();
   availableBodyNode.innerHTML = rows.map((player) => {
     const majorCells = majorKeys.map((majorKey) => {
-      const score = player.majorScores && player.majorScores[majorKey] || "N/A";
+      const score = player.majorScores && player.majorScores[majorKey] || "-";
       return "<td class=\"score " + scoreClass(score) + "\">" + score + "</td>";
     }).join("");
 
-    return "<tr><td>" + (player.rank || "-") + "</td><td>" + player.name + "</td>" + majorCells + "<td class=\"score " + scoreClass(player.overall) + "\">" + (player.overall || "N/A") + "</td><td><button type=\"button\" class=\"secondary-button draft-pick-button\" data-player=\"" + player.name + "\" " + (disabled ? "disabled" : "") + ">Draft</button></td></tr>";
+    return "<tr><td>" + (player.rank || "-") + "</td><td>" + player.name + "</td>" + majorCells + "<td class=\"score " + scoreClass(player.overall) + "\">" + (player.overall || "-") + "</td><td><button type=\"button\" class=\"secondary-button draft-pick-button\" data-player=\"" + player.name + "\" " + (disabled ? "disabled" : "") + ">Draft</button></td></tr>";
   }).join("");
 }
 

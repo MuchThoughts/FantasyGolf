@@ -599,6 +599,12 @@ tbody tr:hover {
   text-align: left;
 }
 
+.draft-players-table td:nth-child(2) {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
 .draft-players-table th:nth-child(3),
 .draft-players-table td:nth-child(3),
 .draft-players-table th:nth-child(4),
@@ -675,6 +681,11 @@ tbody tr:hover {
   justify-content: space-between;
   gap: 0.5rem;
   font-size: 0.84rem;
+}
+
+.team-pick strong {
+  font-size: 0.96rem;
+  line-height: 1.2;
 }
 
 .team-pick.empty span {
