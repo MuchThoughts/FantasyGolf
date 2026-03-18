@@ -7,6 +7,7 @@ const statusNode = document.getElementById("draft-status");
 const onClockNode = document.getElementById("on-clock");
 const pickCounterNode = document.getElementById("pick-counter");
 const teamBoardNode = document.getElementById("team-board");
+const availableTableNode = document.getElementById("available-table");
 const availableBodyNode = document.getElementById("available-body");
 const draftOrderNode = document.getElementById("draft-order");
 const searchInput = document.getElementById("player-search");
@@ -20,6 +21,10 @@ let snakeOrder = [];
 let currentPickIndex = 0;
 let searchQuery = "";
 let isSaving = false;
+let sortState = {
+  key: "rank",
+  direction: "asc"
+};
 
 function normalizeName(name) {
   if (!name) {
@@ -51,6 +56,27 @@ function scoreClass(score) {
   }
 
   return "na";
+}
+
+function parseRelativeScore(scoreText) {
+  if (scoreText === null || scoreText === undefined) {
+    return null;
+  }
+
+  const value = String(scoreText).trim().replace("*", "");
+  if (!value || value === "-") {
+    return null;
+  }
+
+  if (value === "E") {
+    return 0;
+  }
+
+  if (/^[+-]?\d+$/.test(value)) {
+    return Number.parseInt(value, 10);
+  }
+
+  return null;
 }
 
 function clampRounds(roundsValue) {
@@ -213,6 +239,133 @@ function filterAvailablePlayers() {
   return availablePlayers.filter((player) => normalizeName(player.name).includes(normalizedQuery));
 }
 
+function isMissingSortValue(value) {
+  if (value === null || value === undefined) {
+    return true;
+  }
+
+  if (typeof value === "number") {
+    return Number.isNaN(value);
+  }
+
+  if (typeof value === "string") {
+    return !value.trim();
+  }
+
+  return false;
+}
+
+function getPlayerSortValue(player, sortKey) {
+  if (sortKey === "name") {
+    return normalizeName(player && player.name || "");
+  }
+
+  if (sortKey === "rank") {
+    const parsedRank = Number.parseInt(String(player && player.rank || ""), 10);
+    return Number.isNaN(parsedRank) ? null : parsedRank;
+  }
+
+  if (sortKey === "overall") {
+    return parseRelativeScore(player && player.overall);
+  }
+
+  const validMajorKey = sortKey === "masters" || sortKey === "pga" || sortKey === "us_open" || sortKey === "the_open";
+  if (validMajorKey) {
+    return parseRelativeScore(player && player.majorScores && player.majorScores[sortKey]);
+  }
+
+  return null;
+}
+
+function compareSortValues(leftValue, rightValue, direction) {
+  const leftMissing = isMissingSortValue(leftValue);
+  const rightMissing = isMissingSortValue(rightValue);
+
+  if (leftMissing && rightMissing) {
+    return 0;
+  }
+
+  if (leftMissing) {
+    return 1;
+  }
+
+  if (rightMissing) {
+    return -1;
+  }
+
+  let comparison = 0;
+  if (typeof leftValue === "number" && typeof rightValue === "number") {
+    comparison = leftValue - rightValue;
+  } else {
+    comparison = String(leftValue).localeCompare(String(rightValue));
+  }
+
+  if (comparison === 0) {
+    return 0;
+  }
+
+  return direction === "desc" ? -comparison : comparison;
+}
+
+function comparePlayersForSort(leftPlayer, rightPlayer) {
+  const primary = compareSortValues(
+    getPlayerSortValue(leftPlayer, sortState.key),
+    getPlayerSortValue(rightPlayer, sortState.key),
+    sortState.direction
+  );
+  if (primary !== 0) {
+    return primary;
+  }
+
+  const rankTiebreaker = compareSortValues(
+    getPlayerSortValue(leftPlayer, "rank"),
+    getPlayerSortValue(rightPlayer, "rank"),
+    "asc"
+  );
+  if (rankTiebreaker !== 0) {
+    return rankTiebreaker;
+  }
+
+  return normalizeName(leftPlayer && leftPlayer.name || "").localeCompare(normalizeName(rightPlayer && rightPlayer.name || ""));
+}
+
+function getSortedAvailablePlayers() {
+  const rows = filterAvailablePlayers().slice();
+  rows.sort(comparePlayersForSort);
+  return rows;
+}
+
+function renderSortHeaders() {
+  if (!availableTableNode) {
+    return;
+  }
+
+  const buttons = Array.from(availableTableNode.querySelectorAll(".draft-sort-button"));
+  for (const button of buttons) {
+    const sortKey = String(button.dataset && button.dataset.sortKey || "").trim();
+    const label = String(button.dataset && button.dataset.sortLabel || sortKey || "column").trim();
+    const isActive = sortKey === sortState.key;
+    const direction = isActive ? sortState.direction : null;
+    const indicator = button.querySelector(".sort-indicator");
+
+    button.classList.toggle("is-active", isActive);
+    if (indicator) {
+      indicator.textContent = !direction
+        ? "↕"
+        : direction === "asc"
+          ? "↑"
+          : "↓";
+    }
+
+    const ariaSuffix = !direction
+      ? "not sorted"
+      : direction === "asc"
+        ? "sorted ascending"
+        : "sorted descending";
+    button.setAttribute("aria-label", "Sort by " + label + ", currently " + ariaSuffix + ".");
+  }
+}
+
 function buildTeamCard(team, currentTurn) {
   let picksMarkup = "";
   for (let index = 0; index < draftSetup.rounds; index += 1) {
@@ -237,7 +390,8 @@ function renderTeamBoard() {
 
 function renderAvailablePlayers() {
   const majorKeys = getMajorKeys();
-  const rows = filterAvailablePlayers();
+  const rows = getSortedAvailablePlayers();
+  renderSortHeaders();
 
   if (!rows.length) {
     availableBodyNode.innerHTML = "<tr><td colspan=\"8\" class=\"status\">No available players match this filter.</td></tr>";
@@ -485,6 +639,31 @@ if (availableBodyNode) {
     }
 
     draftPlayer(playerName);
+  });
+}
+
+if (availableTableNode) {
+  availableTableNode.addEventListener("click", (event) => {
+    const sortButton = event.target.closest(".draft-sort-button");
+    if (!sortButton) {
+      return;
+    }
+
+    const sortKey = String(sortButton.dataset && sortButton.dataset.sortKey || "").trim();
+    if (!sortKey) {
+      return;
+    }
+
+    if (sortState.key === sortKey) {
+      sortState.direction = sortState.direction === "asc" ? "desc" : "asc";
+    } else {
+      sortState = {
+        key: sortKey,
+        direction: "asc"
+      };
+    }
+
+    renderAvailablePlayers();
   });
 }
 

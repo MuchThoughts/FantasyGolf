@@ -579,6 +579,37 @@ tbody tr:hover {
   letter-spacing: 0.02em;
 }
 
+.draft-sort-button {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.22rem;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  line-height: 1.1;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.draft-sort-button:hover {
+  opacity: 1;
+  color: #1e2a2f;
+}
+
+.draft-sort-button .sort-indicator {
+  opacity: 0.45;
+}
+
+.draft-sort-button.is-active .sort-indicator {
+  opacity: 1;
+}
+
 .draft-players-table th,
 .draft-players-table td {
   padding: 0.38rem 0.26rem;
@@ -597,6 +628,10 @@ tbody tr:hover {
 .draft-players-table td:nth-child(2) {
   width: 28%;
   text-align: left;
+}
+
+.draft-players-table th:nth-child(2) .draft-sort-button {
+  justify-content: flex-start;
 }
 
 .draft-players-table td:nth-child(2) {

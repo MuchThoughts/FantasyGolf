@@ -42,13 +42,48 @@
             <table id="available-table" class="draft-players-table">
               <thead>
                 <tr>
-                  <th scope="col">Rank</th>
-                  <th scope="col">Player</th>
-                  <th scope="col">Masters</th>
-                  <th scope="col">PGA</th>
-                  <th scope="col">U.S. Open</th>
-                  <th scope="col">The Open</th>
-                  <th scope="col">Overall</th>
+                  <th scope="col">
+                    <button type="button" class="draft-sort-button" data-sort-key="rank" data-sort-label="Rank">
+                      <span class="sort-label">Rank</span>
+                      <span class="sort-indicator" aria-hidden="true">↕</span>
+                    </button>
+                  </th>
+                  <th scope="col">
+                    <button type="button" class="draft-sort-button" data-sort-key="name" data-sort-label="Player">
+                      <span class="sort-label">Player</span>
+                      <span class="sort-indicator" aria-hidden="true">↕</span>
+                    </button>
+                  </th>
+                  <th scope="col">
+                    <button type="button" class="draft-sort-button" data-sort-key="masters" data-sort-label="Masters">
+                      <span class="sort-label">Masters</span>
+                      <span class="sort-indicator" aria-hidden="true">↕</span>
+                    </button>
+                  </th>
+                  <th scope="col">
+                    <button type="button" class="draft-sort-button" data-sort-key="pga" data-sort-label="PGA">
+                      <span class="sort-label">PGA</span>
+                      <span class="sort-indicator" aria-hidden="true">↕</span>
+                    </button>
+                  </th>
+                  <th scope="col">
+                    <button type="button" class="draft-sort-button" data-sort-key="us_open" data-sort-label="U.S. Open">
+                      <span class="sort-label">U.S. Open</span>
+                      <span class="sort-indicator" aria-hidden="true">↕</span>
+                    </button>
+                  </th>
+                  <th scope="col">
+                    <button type="button" class="draft-sort-button" data-sort-key="the_open" data-sort-label="The Open">
+                      <span class="sort-label">The Open</span>
+                      <span class="sort-indicator" aria-hidden="true">↕</span>
+                    </button>
+                  </th>
+                  <th scope="col">
+                    <button type="button" class="draft-sort-button" data-sort-key="overall" data-sort-label="Overall">
+                      <span class="sort-label">Overall</span>
+                      <span class="sort-indicator" aria-hidden="true">↕</span>
+                    </button>
+                  </th>
                   <th scope="col">Draft</th>
                 </tr>
               </thead>
