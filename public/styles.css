@@ -519,11 +519,12 @@ tbody tr:hover {
 .draft-layout {
   margin-top: 1rem;
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(440px, 1.4fr);
+  grid-template-columns: minmax(270px, 0.85fr) minmax(0, 1.15fr);
   gap: 1rem;
 }
 
 .draft-pane {
+  min-width: 0;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -562,6 +563,67 @@ tbody tr:hover {
   font-size: 0.92rem;
   padding: 0.45rem 0.6rem;
   width: min(320px, 100%);
+}
+
+.draft-pane .table-wrap {
+  overflow-x: hidden;
+}
+
+.draft-players-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.draft-players-table thead th {
+  font-size: 0.64rem;
+  letter-spacing: 0.02em;
+}
+
+.draft-players-table th,
+.draft-players-table td {
+  padding: 0.38rem 0.26rem;
+  font-size: 0.72rem;
+  line-height: 1.15;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.draft-players-table th:nth-child(1),
+.draft-players-table td:nth-child(1) {
+  width: 8%;
+}
+
+.draft-players-table th:nth-child(2),
+.draft-players-table td:nth-child(2) {
+  width: 28%;
+  text-align: left;
+}
+
+.draft-players-table th:nth-child(3),
+.draft-players-table td:nth-child(3),
+.draft-players-table th:nth-child(4),
+.draft-players-table td:nth-child(4),
+.draft-players-table th:nth-child(5),
+.draft-players-table td:nth-child(5),
+.draft-players-table th:nth-child(6),
+.draft-players-table td:nth-child(6) {
+  width: 11%;
+}
+
+.draft-players-table th:nth-child(7),
+.draft-players-table td:nth-child(7) {
+  width: 10%;
+}
+
+.draft-players-table th:nth-child(8),
+.draft-players-table td:nth-child(8) {
+  width: 10%;
+}
+
+.draft-pick-button {
+  padding: 0.32rem 0.44rem;
+  border-radius: 9px;
+  font-size: 0.7rem;
 }
 
 .draft-team-board {
@@ -659,12 +721,6 @@ tbody tr:hover {
   background: #164f34;
   border-color: #164f34;
   color: #ffffff;
-}
-
-.draft-actions {
-  margin-top: 1rem;
-  display: flex;
-  justify-content: flex-end;
 }
 
 @media (max-width: 1080px) {
