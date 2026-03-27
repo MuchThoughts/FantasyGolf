@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { auth, userApi } from '../../lib/auth'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
+import { auth } from '../../lib/auth'
 import { leagueApi } from '../../lib/api'
+import type { League } from '../../lib/types'
 import { LeagueCard } from '../../components/LeagueCard'
 import { LeagueForm } from '../../components/LeagueForm'
 import { Button } from '../../components/ui/Button'
 
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null)
-  const [leagues, setLeagues] = useState<any[]>([])
+  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [leagues, setLeagues] = useState<League[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const router = useRouter()
@@ -54,7 +56,7 @@ export default function Dashboard() {
 
       {showCreateForm && (
         <div className="mb-8">
-          <LeagueForm />
+          <LeagueForm userId={user!.id} />
         </div>
       )}
 

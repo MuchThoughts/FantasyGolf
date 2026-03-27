@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import { lineupApi, leagueApi } from '../lib/api'
+import { lineupApi } from '../lib/api'
+import type { Golfer } from '../lib/types'
 import { Button } from './ui/Button'
-import { Label } from './ui/Label'
 
 interface LineupManagerProps {
   leagueId: string
   eventId: string
+  userId: string
 }
 
-export function LineupManager({ leagueId, eventId }: LineupManagerProps) {
-  const [team, setTeam] = useState<any[]>([])
+export function LineupManager({ leagueId, eventId, userId }: LineupManagerProps) {
+  const [team, setTeam] = useState<Golfer[]>([])
   const [selectedStarters, setSelectedStarters] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -44,7 +45,7 @@ export function LineupManager({ leagueId, eventId }: LineupManagerProps) {
   }
 
   const handleSubmitLineup = async () => {
-    const { error } = await lineupApi.set(eventId, 'current-user-id', selectedStarters)
+    const { error } = await lineupApi.set(eventId, userId, selectedStarters)
     if (!error) {
       alert('Lineup submitted successfully!')
     }

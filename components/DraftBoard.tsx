@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react'
-import { draftApi, golferApi, leagueApi } from '../lib/api'
+import { draftApi, golferApi } from '../lib/api'
+import type { DraftPick, Golfer } from '../lib/types'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Label } from './ui/Label'
 
 interface DraftBoardProps {
   leagueId: string
+  userId: string
 }
 
-export function DraftBoard({ leagueId }: DraftBoardProps) {
-  const [picks, setPicks] = useState<any[]>([])
-  const [availableGolfers, setAvailableGolfers] = useState<any[]>([])
+export function DraftBoard({ leagueId, userId }: DraftBoardProps) {
+  const [picks, setPicks] = useState<DraftPick[]>([])
+  const [availableGolfers, setAvailableGolfers] = useState<Golfer[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedGolfer, setSelectedGolfer] = useState<string | null>(null)
@@ -44,7 +46,7 @@ export function DraftBoard({ leagueId }: DraftBoardProps) {
     const nextPickNumber = picks.length + 1
     const { data, error } = await draftApi.makePick(
       leagueId,
-      'current-user-id', // This would come from auth context
+      userId,
       selectedGolfer,
       nextPickNumber
     )

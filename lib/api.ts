@@ -62,23 +62,16 @@ export const leagueApi = {
   },
 
   list: async (userId: string): Promise<{ data: League[] | null; error: any }> => {
-    const { data: leagueIds, error: leagueError } = await supabase
-      .from('league_members')
-      .select('league_id')
-      .eq('user_id', userId)
-
-    if (leagueError) return { data: null, error: leagueError }
-
     const { data, error } = await supabase
       .from('leagues')
       .select(`
         *,
-        league_members (
+        league_members!inner (
           user_id,
           users (display_name)
         )
       `)
-      .in('id', leagueIds.map(l => l.league_id))
+      .eq('league_members.user_id', userId)
     return { data, error }
   }
 }

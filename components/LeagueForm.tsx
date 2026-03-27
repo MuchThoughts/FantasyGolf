@@ -5,7 +5,11 @@ import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Label } from './ui/Label'
 
-export function LeagueForm() {
+interface LeagueFormProps {
+  userId: string
+}
+
+export function LeagueForm({ userId }: LeagueFormProps) {
   const [name, setName] = useState('')
   const [maxMembers, setMaxMembers] = useState('6')
   const [loading, setLoading] = useState(false)
@@ -18,12 +22,9 @@ export function LeagueForm() {
     setError(null)
 
     try {
-      const user = await supabase.auth.getUser()
-      if (!user.data.user) throw new Error('Not authenticated')
-
       const { data, error } = await leagueApi.create(
         name,
-        user.data.user.id,
+        userId,
         parseInt(maxMembers),
         new Date().getFullYear()
       )
