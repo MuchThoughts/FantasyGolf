@@ -1460,7 +1460,7 @@ async function loadData(forceRefresh = false) {
 
     renderApp(currentPayload);
 
-    subtitleNode.textContent = `${getSeasonTabLabel()} for ${selectedLeagueName} (${selectedSeasonYear}) with tabbed major scoreboards.`;
+    subtitleNode.textContent = '';
     updatedAtNode.textContent = `Updated ${toFriendlyDate(currentPayload.updatedAt)}`;
     setDefaultStatusForTab();
     if (selectionsStatusNote) {
