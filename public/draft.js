@@ -816,6 +816,9 @@ async function initializeDraftPage() {
         throw new Error(body && (body.detail || body.error) || "Could not initialize async draft.");
       }
 
+      // Clear sessionStorage so refreshes use the URL-based Supabase fetch path
+      window.sessionStorage.removeItem(DRAFT_SETUP_STORAGE_KEY);
+
       // Update URL so it's shareable
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.set("league", draftSetup.leagueName);
