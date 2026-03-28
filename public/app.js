@@ -22,12 +22,12 @@ const leagueFormHint = document.getElementById('league-form-hint');
 
 const DEFAULT_LEAGUE_NAME = 'Davidson';
 const DRAFT_SETUP_STORAGE_KEY = 'fantasyGolfDraftSetup';
-const DRAFT_SEASON_YEAR = 2025;
+const DRAFT_SEASON_YEAR = 2026;
 
 let currentPayload = null;
 let teamUiState = {};
 let activeTab = 'season';
-let selectedSeasonYear = 2025;
+let selectedSeasonYear = 2026;
 let selectedLeagueName = DEFAULT_LEAGUE_NAME;
 let currentLeagueSetupMode = 'selected';
 let availableLeagues = [];
