@@ -21,6 +21,9 @@ let snakeOrder = [];
 let currentPickIndex = 0;
 let searchQuery = "";
 let isSaving = false;
+let isAsyncMode = false;
+let isSubmittingPick = false;
+let pollingInterval = null;
 let sortState = {
   key: "rank",
   direction: "asc"
@@ -147,6 +150,8 @@ function sanitizeDraftSetup(rawSetup) {
     seasonYear: Number.isNaN(seasonYear) ? DEFAULT_DRAFT_SEASON_YEAR : seasonYear,
     rounds,
     users: cleanUsers,
+    draftMode: rawSetup && rawSetup.draftMode === 'async' ? 'async' : 'snake',
+    excludeScheffler: !!(rawSetup && rawSetup.excludeScheffler),
     createdAt: rawSetup && rawSetup.createdAt || null
   };
 }
@@ -432,14 +437,23 @@ function renderStatus() {
   if (isDraftComplete()) {
     onClockNode.textContent = "Draft complete";
     pickCounterNode.textContent = "All " + snakeOrder.length + " picks are in.";
-    statusNode.textContent = "Draft complete. Save this league to continue.";
-    saveDraftButton.disabled = isSaving;
+    if (isAsyncMode) {
+      statusNode.textContent = "Draft complete — saving league...";
+      saveDraftButton.disabled = true;
+    } else {
+      statusNode.textContent = "Draft complete. Save this league to continue.";
+      saveDraftButton.disabled = isSaving;
+    }
     return;
   }
 
-  onClockNode.textContent = "On the clock: " + currentTurn.userName;
-  pickCounterNode.textContent = "Pick " + (currentPickIndex + 1) + " of " + snakeOrder.length + " (Round " + currentTurn.round + ")";
-  statusNode.textContent = currentTurn.userName + " is drafting now.";
+  onClockNode.textContent = "\uD83D\uDFE1 " + currentTurn.userName + " is on the clock";
+  pickCounterNode.textContent = "Pick " + (currentPickIndex + 1) + " of " + snakeOrder.length + " \u2014 Round " + currentTurn.round;
+  if (isAsyncMode) {
+    statusNode.textContent = "Waiting for " + currentTurn.userName + " to pick. Page auto-refreshes every 20 seconds.";
+  } else {
+    statusNode.textContent = currentTurn.userName + " is drafting now.";
+  }
   saveDraftButton.disabled = true;
 }
 
@@ -450,31 +464,149 @@ function renderAll() {
   renderDraftOrder();
 }
 
-function draftPlayer(playerName) {
-  if (isDraftComplete()) {
-    return;
-  }
-
+function applyPickLocally(playerName) {
   const currentTurn = getCurrentTurn();
-  if (!currentTurn) {
-    return;
-  }
+  if (!currentTurn) return false;
 
   const playerIndex = availablePlayers.findIndex((player) => player.name === playerName);
-  if (playerIndex < 0) {
-    return;
-  }
+  if (playerIndex < 0) return false;
 
   const pickedPlayer = availablePlayers.splice(playerIndex, 1)[0];
   const team = getTeamByName(currentTurn.userName);
-  if (!team) {
-    return;
-  }
+  if (!team) return false;
 
   team.players.push(pickedPlayer);
   currentPickIndex += 1;
-  saveStoredSetup();
-  renderAll();
+  return true;
+}
+
+function draftPlayer(playerName) {
+  if (isDraftComplete() || isSubmittingPick) return;
+
+  if (isAsyncMode) {
+    submitAsyncPick(playerName);
+  } else {
+    if (applyPickLocally(playerName)) {
+      saveStoredSetup();
+      renderAll();
+    }
+  }
+}
+
+async function submitAsyncPick(playerName) {
+  if (isSubmittingPick) return;
+  isSubmittingPick = true;
+  statusNode.textContent = "Saving pick...";
+
+  try {
+    const response = await fetch("/api/async-draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "pick",
+        league: draftSetup.leagueName,
+        year: draftSetup.seasonYear,
+        playerName
+      })
+    });
+
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(body && (body.detail || body.error) || "Pick failed with status " + response.status);
+    }
+
+    applyAsyncState(body.state);
+    renderAll();
+
+    if (isDraftComplete()) {
+      autoSaveAsyncLeague();
+    }
+  } catch (error) {
+    statusNode.textContent = "Could not save pick: " + error.message;
+  } finally {
+    isSubmittingPick = false;
+  }
+}
+
+async function pollAsyncDraft() {
+  if (isDraftComplete() || isSubmittingPick) return;
+
+  try {
+    const params = new URLSearchParams({ league: draftSetup.leagueName, year: String(draftSetup.seasonYear) });
+    const response = await fetch("/api/async-draft?" + params.toString());
+    if (!response.ok) return;
+
+    const body = await response.json();
+    if (!body.state) return;
+
+    const prevIndex = currentPickIndex;
+    applyAsyncState(body.state);
+    if (currentPickIndex !== prevIndex) {
+      renderAll();
+      if (isDraftComplete()) {
+        clearInterval(pollingInterval);
+        autoSaveAsyncLeague();
+      }
+    }
+  } catch (_) {
+    // Silently ignore poll failures
+  }
+}
+
+function applyAsyncState(state) {
+  if (!state || !Array.isArray(state.picks)) return;
+
+  // Reset teams and available players from full pool, then replay picks
+  const allPlayers = (draftPool && draftPool.players || []).slice();
+  if (draftSetup.excludeScheffler) {
+    const idx = allPlayers.findIndex((p) => normalizeName(p.name) === normalizeName("Scottie Scheffler"));
+    if (idx >= 0) allPlayers.splice(idx, 1);
+  }
+
+  teams = draftSetup.users.map((user) => ({ name: user.name, players: [] }));
+  const availableByName = new Map(allPlayers.map((p) => [normalizeName(p.name), p]));
+
+  for (const pick of state.picks) {
+    const team = getTeamByName(pick.userName);
+    const player = availableByName.get(normalizeName(pick.playerName));
+    if (team && player) {
+      team.players.push(player);
+      availableByName.delete(normalizeName(pick.playerName));
+    }
+  }
+
+  availablePlayers = Array.from(availableByName.values());
+  currentPickIndex = Math.min(state.picks.length, snakeOrder.length);
+}
+
+async function autoSaveAsyncLeague() {
+  isSaving = true;
+  statusNode.textContent = "Saving league...";
+
+  try {
+    const users = teams.map((team) => ({
+      name: team.name,
+      players: team.players.map((player) => player.name)
+    }));
+
+    const response = await fetch("/api/leagues", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: draftSetup.leagueName, users })
+    });
+
+    const responseBody = await response.json();
+    if (!response.ok) {
+      throw new Error(responseBody && (responseBody.detail || responseBody.error) || "Save failed");
+    }
+
+    const savedLeagueName = responseBody && responseBody.league && responseBody.league.name || draftSetup.leagueName;
+    window.sessionStorage.removeItem(DRAFT_SETUP_STORAGE_KEY);
+    window.location.href = "/?league=" + encodeURIComponent(savedLeagueName) + "&year=" + encodeURIComponent(String(draftSetup.seasonYear));
+  } catch (error) {
+    isSaving = false;
+    statusNode.textContent = "Could not save league: " + error.message;
+  }
 }
 
 async function saveLeagueFromDraft() {
@@ -606,19 +738,99 @@ function applyStoredPicks() {
 }
 
 async function initializeDraftPage() {
+  // Support loading async draft from URL params (shareable link)
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlLeague = urlParams.get("league");
+  const urlYear = urlParams.get("year");
+
+  if (urlLeague && urlYear && !window.sessionStorage.getItem(DRAFT_SETUP_STORAGE_KEY)) {
+    // Load async draft state from Supabase directly
+    statusNode.textContent = "Loading draft...";
+    try {
+      const params = new URLSearchParams({ league: urlLeague, year: urlYear });
+      const response = await fetch("/api/async-draft?" + params.toString());
+      const body = await response.json();
+      if (!response.ok || !body.state) {
+        throw new Error(body && (body.error || body.detail) || "Draft not found.");
+      }
+      const state = body.state;
+      draftSetup = {
+        leagueName: state.leagueName,
+        seasonYear: state.seasonYear,
+        rounds: state.rounds,
+        users: state.users,
+        draftMode: "async",
+        excludeScheffler: !!(state.excludeScheffler),
+        createdAt: state.createdAt || null
+      };
+      isAsyncMode = true;
+      subtitleNode.textContent = state.leagueName + " async draft";
+      metaNode.textContent = "Season " + state.seasonYear;
+      teams = draftSetup.users.map((user) => ({ name: user.name, players: [] }));
+      snakeOrder = buildSnakeOrder(teams, draftSetup.rounds);
+
+      draftPool = await loadDraftPool(draftSetup.seasonYear);
+      applyAsyncState(state);
+      renderAll();
+
+      if (!isDraftComplete()) {
+        // Update URL to include params for shareability
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.set("league", draftSetup.leagueName);
+        newUrl.searchParams.set("year", String(draftSetup.seasonYear));
+        window.history.replaceState({}, "", newUrl.toString());
+        pollingInterval = setInterval(pollAsyncDraft, 20000);
+      }
+    } catch (error) {
+      statusNode.textContent = "Could not load draft: " + error.message;
+      saveDraftButton.disabled = true;
+    }
+    return;
+  }
+
   if (!initializeDraftFromSetup()) {
     return;
   }
 
+  isAsyncMode = draftSetup.draftMode === "async";
   statusNode.textContent = "Loading top 200 players and major scores...";
 
   try {
     draftPool = await loadDraftPool(draftSetup.seasonYear);
     availablePlayers = (draftPool.players || []).slice();
-    applyStoredPicks();
 
-    metaNode.textContent = "Season " + draftPool.seasonYear + " data";
-    renderAll();
+    if (draftSetup.excludeScheffler) {
+      const idx = availablePlayers.findIndex((p) => normalizeName(p.name) === normalizeName("Scottie Scheffler"));
+      if (idx >= 0) availablePlayers.splice(idx, 1);
+    }
+
+    if (isAsyncMode) {
+      // Initialize draft in Supabase
+      const response = await fetch("/api/async-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "init", setup: draftSetup })
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body && (body.detail || body.error) || "Could not initialize async draft.");
+      }
+
+      // Update URL so it's shareable
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set("league", draftSetup.leagueName);
+      newUrl.searchParams.set("year", String(draftSetup.seasonYear));
+      window.history.replaceState({}, "", newUrl.toString());
+
+      applyAsyncState(body.state);
+      metaNode.textContent = "Season " + draftPool.seasonYear + " \u2014 share this page URL to draft";
+      renderAll();
+      pollingInterval = setInterval(pollAsyncDraft, 20000);
+    } else {
+      applyStoredPicks();
+      metaNode.textContent = "Season " + draftPool.seasonYear + " data";
+      renderAll();
+    }
   } catch (error) {
     subtitleNode.textContent = "Draft data could not be loaded";
     statusNode.textContent = "Could not load draft data: " + error.message;
