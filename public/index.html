@@ -50,7 +50,8 @@
             <span>Setup Mode</span>
             <select id="league-mode-select">
               <option value="selected">Enter already selected players</option>
-              <option value="draft">Run a snake draft</option>
+              <option value="draft">Run a live snake draft</option>
+              <option value="async">Run an async draft</option>
             </select>
           </label>
           <label id="draft-rounds-wrap" class="field hidden-field">
@@ -62,6 +63,10 @@
               <option value="7">7</option>
               <option value="8">8</option>
             </select>
+          </label>
+          <label id="exclude-scheffler-wrap" class="field hidden-field">
+            <input type="checkbox" id="exclude-scheffler" />
+            <span>Exclude Scottie Scheffler from draft</span>
           </label>
           <div class="league-users-head">
             <h3>Users</h3>

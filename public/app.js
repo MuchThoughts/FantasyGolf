@@ -19,6 +19,8 @@ const leagueModeSelect = document.getElementById('league-mode-select');
 const draftRoundsWrap = document.getElementById('draft-rounds-wrap');
 const draftRoundsSelect = document.getElementById('draft-rounds-select');
 const leagueFormHint = document.getElementById('league-form-hint');
+const excludeSchefflerWrap = document.getElementById('exclude-scheffler-wrap');
+const excludeSchefflerCheckbox = document.getElementById('exclude-scheffler');
 
 const DEFAULT_LEAGUE_NAME = 'Davidson';
 const DRAFT_SETUP_STORAGE_KEY = 'fantasyGolfDraftSetup';
@@ -568,34 +570,46 @@ function createLeagueUserRow(initialUser = null) {
 
 function getLeagueSetupMode() {
   const mode = String(leagueModeSelect?.value || 'selected').trim().toLowerCase();
-  return mode === 'draft' ? 'draft' : 'selected';
+  if (mode === 'draft') return 'draft';
+  if (mode === 'async') return 'async';
+  return 'selected';
 }
 
 function updateLeagueSetupModeUi(mode = getLeagueSetupMode()) {
   currentLeagueSetupMode = mode;
-  const isDraft = mode === 'draft';
+  const isDraftMode = mode === 'draft' || mode === 'async';
 
   if (leagueForm) {
     leagueForm.dataset.setupMode = mode;
   }
 
   if (leagueUsersList) {
-    leagueUsersList.classList.toggle('is-draft-mode', isDraft);
+    leagueUsersList.classList.toggle('is-draft-mode', isDraftMode);
   }
 
   if (draftRoundsWrap) {
-    draftRoundsWrap.classList.toggle('hidden-field', !isDraft);
+    draftRoundsWrap.classList.toggle('hidden-field', !isDraftMode);
+  }
+
+  if (excludeSchefflerWrap) {
+    excludeSchefflerWrap.classList.toggle('hidden-field', !isDraftMode);
   }
 
   if (leagueFormHint) {
-    leagueFormHint.textContent = isDraft
-      ? 'Enter user names, pick 4-8 rounds, then continue to the snake draft board.'
-      : 'Each user needs 4-8 golfers. Start with 4 and click + Player to add more.';
+    if (mode === 'async') {
+      leagueFormHint.textContent = 'Enter user names in draft order, pick rounds, then start the async draft. Anyone can open the draft link to make picks when it\'s their turn.';
+    } else if (mode === 'draft') {
+      leagueFormHint.textContent = 'Enter user names, pick 4-8 rounds, then continue to the live snake draft board.';
+    } else {
+      leagueFormHint.textContent = 'Each user needs 4-8 golfers. Start with 4 and click + Player to add more.';
+    }
   }
 
   const submitButton = leagueForm?.querySelector('button[type="submit"]');
   if (submitButton) {
-    submitButton.textContent = isDraft ? 'Continue to Draft' : 'Save League';
+    if (mode === 'async') submitButton.textContent = 'Start Async Draft';
+    else if (mode === 'draft') submitButton.textContent = 'Continue to Draft';
+    else submitButton.textContent = 'Save League';
   }
 }
 
@@ -607,6 +621,9 @@ function resetLeagueForm() {
   }
   if (draftRoundsSelect) {
     draftRoundsSelect.value = String(leagueLimits.minPlayersPerUser);
+  }
+  if (excludeSchefflerCheckbox) {
+    excludeSchefflerCheckbox.checked = false;
   }
   updateLeagueSetupModeUi('selected');
   leagueUsersList.innerHTML = '';
@@ -844,7 +861,7 @@ function collectLeagueUsersForDraft() {
   return users;
 }
 
-function startDraftFromForm(leagueName) {
+function startDraftFromForm(leagueName, draftMode) {
   const users = collectLeagueUsersForDraft();
   const roundsInput = Number.parseInt(String(draftRoundsSelect?.value || leagueLimits.minPlayersPerUser), 10);
   const rounds = Number.isNaN(roundsInput)
@@ -856,6 +873,8 @@ function startDraftFromForm(leagueName) {
     seasonYear: DRAFT_SEASON_YEAR,
     rounds,
     users,
+    draftMode: draftMode === 'async' ? 'async' : 'snake',
+    excludeScheffler: !!(excludeSchefflerCheckbox?.checked),
     createdAt: new Date().toISOString()
   };
 
@@ -882,9 +901,9 @@ async function createLeagueFromForm(event) {
   const setupMode = getLeagueSetupMode();
   updateLeagueSetupModeUi(setupMode);
 
-  if (setupMode === "draft") {
+  if (setupMode === "draft" || setupMode === "async") {
     try {
-      startDraftFromForm(leagueName);
+      startDraftFromForm(leagueName, setupMode);
     } catch (error) {
       leagueFormStatus.textContent = error.message;
     }
