@@ -1560,9 +1560,8 @@ if (closeLeagueModalButton) {
 
 if (leagueModeSelect) {
   leagueModeSelect.addEventListener('change', (event) => {
-    const mode = String(event.target?.value || 'selected').trim().toLowerCase() === 'draft'
-      ? 'draft'
-      : 'selected';
+    const raw = String(event.target?.value || 'selected').trim().toLowerCase();
+    const mode = raw === 'draft' ? 'draft' : raw === 'async' ? 'async' : 'selected';
 
     updateLeagueSetupModeUi(mode);
     leagueFormStatus.textContent = '';
