@@ -642,7 +642,7 @@ async function saveLeagueFromDraft() {
 
     const savedLeagueName = responseBody && responseBody.league && responseBody.league.name || draftSetup.leagueName;
     window.sessionStorage.removeItem(DRAFT_SETUP_STORAGE_KEY);
-    window.location.href = "/?league=" + encodeURIComponent(savedLeagueName) + "&year=" + encodeURIComponent(String(draftSetup.seasonYear));
+    window.location.href = "/?league=" + encodeURIComponent(savedLeagueName);
   } catch (error) {
     isSaving = false;
     renderAll();

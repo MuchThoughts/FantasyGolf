@@ -45,13 +45,9 @@ const topPlayerByNormalizedName = new Map();
 try {
   const initialParams = new URLSearchParams(window.location.search || '');
   const requestedLeague = String(initialParams.get('league') || '').trim();
-  const requestedYear = Number.parseInt(String(initialParams.get('year') || ''), 10);
 
   if (requestedLeague) {
     selectedLeagueName = requestedLeague;
-  }
-  if (!Number.isNaN(requestedYear)) {
-    selectedSeasonYear = requestedYear;
   }
 } catch (error) {
   // Ignore invalid URL parsing and keep defaults.
