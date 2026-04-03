@@ -278,6 +278,25 @@ function makeEmptySelections(majors) {
   return selections;
 }
 
+function shouldAutoSelectTeam(team) {
+  return (team?.players?.length || 0) === 4;
+}
+
+function buildAutoSelections(team, majors) {
+  const selections = makeEmptySelections(majors || []);
+  const pickCount = Math.min(4, team?.players?.length || 0);
+
+  for (const major of majors || []) {
+    const selectedSet = new Set();
+    for (let playerIndex = 0; playerIndex < pickCount; playerIndex += 1) {
+      selectedSet.add(playerIndex);
+    }
+    selections[major.key] = selectedSet;
+  }
+
+  return selections;
+}
+
 function hasAnySelections(selections, majors) {
   return (majors || []).some((major) => (selections?.[major.key]?.size || 0) > 0);
 }
@@ -348,10 +367,14 @@ function buildSelectionsFromSavedRow(team, majors, rawSelections) {
 function initializeTeamState(payload) {
   teamUiState = {};
   for (const team of payload.teams || []) {
+    const autoSelected = shouldAutoSelectTeam(team);
     teamUiState[team.name] = {
       editing: false,
-      hasSavedSelection: false,
-      selections: makeEmptySelections(payload.majors || [])
+      autoSelected,
+      hasSavedSelection: autoSelected,
+      selections: autoSelected
+        ? buildAutoSelections(team, payload.majors || [])
+        : makeEmptySelections(payload.majors || [])
     };
   }
 }
@@ -360,6 +383,7 @@ function ensureTeamState(teamName) {
   if (!teamUiState[teamName]) {
     teamUiState[teamName] = {
       editing: false,
+      autoSelected: false,
       hasSavedSelection: false,
       selections: makeEmptySelections(currentPayload?.majors || [])
     };
@@ -379,6 +403,15 @@ function hydrateSavedSelections(payload, rows) {
 
   for (const team of payload?.teams || []) {
     const state = ensureTeamState(team.name);
+    if (shouldAutoSelectTeam(team)) {
+      state.autoSelected = true;
+      state.editing = false;
+      state.hasSavedSelection = true;
+      state.selections = buildAutoSelections(team, payload?.majors || []);
+      continue;
+    }
+
+    state.autoSelected = false;
     const savedRow = rowsByTeamName.get(team.name);
 
     if (!savedRow) {
@@ -1067,6 +1100,7 @@ function buildSeasonView(payload) {
 
   const cards = teams.map((team) => {
     const state = ensureTeamState(team.name);
+    const isAutoSelected = state.autoSelected || shouldAutoSelectTeam(team);
 
     const headerCells = majors
       .map((major) => `<th scope="col">${major.name}</th>`)
@@ -1158,9 +1192,11 @@ function buildSeasonView(payload) {
       <article class="team-card">
         <div class="team-card-head">
           <h2>${team.name}</h2>
-          <button type="button" class="team-edit-button" data-team="${team.name}">
+          ${isAutoSelected
+            ? '<span class="footnote">Auto-selected (4 players)</span>'
+            : `<button type="button" class="team-edit-button" data-team="${team.name}">
             ${state.editing ? 'Save' : 'Edit'}
-          </button>
+          </button>`}
         </div>
         <div class="table-wrap">
           <table>
@@ -1373,6 +1409,12 @@ function onContainerClick(event) {
 
   const teamName = button.dataset.team;
   const state = ensureTeamState(teamName);
+  const team = getTeamByName(teamName);
+
+  if (state.autoSelected || shouldAutoSelectTeam(team)) {
+    statusNode.textContent = `${teamName} has 4 players, so all 4 are auto-selected for every major.`;
+    return;
+  }
 
   if (state.editing) {
     state.editing = false;
