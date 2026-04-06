@@ -23,14 +23,16 @@ const excludeSchefflerWrap = document.getElementById('exclude-scheffler-wrap');
 const excludeSchefflerCheckbox = document.getElementById('exclude-scheffler');
 
 const DEFAULT_LEAGUE_NAME = 'Davidson';
+const HOME_DEFAULT_LEAGUE_NAME = 'Neighborhood Competition';
+const HOME_DEFAULT_TAB = 'masters';
 const DRAFT_SETUP_STORAGE_KEY = 'fantasyGolfDraftSetup';
 const DRAFT_SEASON_YEAR = 2025;
 
 let currentPayload = null;
 let teamUiState = {};
-let activeTab = 'season';
+let activeTab = HOME_DEFAULT_TAB;
 let selectedSeasonYear = 2026;
-let selectedLeagueName = DEFAULT_LEAGUE_NAME;
+let selectedLeagueName = HOME_DEFAULT_LEAGUE_NAME;
 let currentLeagueSetupMode = 'selected';
 let availableLeagues = [];
 let leagueLimits = {
@@ -1496,7 +1498,6 @@ async function loadData(forceRefresh = false) {
     currentPayload = await response.json();
     selectedSeasonYear = Number.parseInt(String(currentPayload?.seasonYear || selectedSeasonYear), 10);
     selectedLeagueName = String(currentPayload?.leagueName || selectedLeagueName);
-    activeTab = 'season';
     syncYearToggle(currentPayload);
     syncLeagueToggle();
     initializeTeamState(currentPayload);
