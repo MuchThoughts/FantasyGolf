@@ -124,6 +124,36 @@ function formatScoreValue(scoreValue, partial = false) {
   return partial ? `${base}*` : base;
 }
 
+function getMajorFallbackScore(majorKey) {
+  const major = getMajorByKey(majorKey);
+  if (!major || major.secondRoundComplete !== true) {
+    return null;
+  }
+
+  const score = major.defaultMissingScore;
+  if (typeof score !== 'number' || Number.isNaN(score)) {
+    return null;
+  }
+
+  return score;
+}
+
+function applyMissingScoreRule(scoreValues, missingCount, majorKey) {
+  const values = scoreValues
+    .filter((value) => typeof value === 'number' && !Number.isNaN(value))
+    .slice();
+  const fallbackScore = getMajorFallbackScore(majorKey);
+
+  if (missingCount > 1 && typeof fallbackScore === 'number') {
+    const fallbackCount = missingCount - 1;
+    for (let index = 0; index < fallbackCount; index += 1) {
+      values.push(fallbackScore);
+    }
+  }
+
+  return values;
+}
+
 function toFriendlyDate(value) {
   if (!value) {
     return 'Unknown';
@@ -1035,12 +1065,15 @@ function computeTop3FromSelections(team, majors, selections) {
 
   for (const major of majors) {
     const selectedIndexes = Array.from(selections[major.key] || []);
-    const selectedScores = selectedIndexes
-      .map((index) => parseScoreValue(team.players?.[index]?.majorScores?.[major.key]))
-      .filter((value) => typeof value === 'number')
+    const selectedScoreValues = selectedIndexes
+      .map((index) => parseScoreValue(team.players?.[index]?.majorScores?.[major.key]));
+    const selectedScores = selectedScoreValues
+      .filter((value) => typeof value === 'number');
+    const missingScores = selectedScoreValues.length - selectedScores.length;
+    const scoredWithFallback = applyMissingScoreRule(selectedScores, missingScores, major.key)
       .sort((a, b) => a - b);
 
-    const bestThree = selectedScores.slice(0, 3);
+    const bestThree = scoredWithFallback.slice(0, 3);
 
     if (bestThree.length === 0) {
       majorTotals[major.key] = {
@@ -1274,19 +1307,23 @@ function buildMajorScoreboardView(payload, majorKey) {
       };
     });
 
-    const selectedScoreValues = pickSlots
-      .map((slot) => slot.scoreValue)
+    const pickedScoreValues = pickSlots
+      .filter((slot) => slot.name)
+      .map((slot) => slot.scoreValue);
+    const selectedScoreValues = pickedScoreValues
       .filter((value) => typeof value === 'number');
+    const missingScores = pickedScoreValues.length - selectedScoreValues.length;
+    const scoredWithFallback = applyMissingScoreRule(selectedScoreValues, missingScores, majorKey);
 
-    const selected4Sum = selectedScoreValues.length
-      ? selectedScoreValues.reduce((sum, value) => sum + value, 0)
+    const selected4Sum = scoredWithFallback.length
+      ? scoredWithFallback.reduce((sum, value) => sum + value, 0)
       : null;
-    const selected4Partial = pickedPlayers.length < 4 || selectedScoreValues.length < pickedPlayers.length;
+    const selected4Partial = pickedPlayers.length < 4 || missingScores > 0;
     const selected4Display = selected4Sum === null
       ? '-'
       : formatScoreValue(selected4Sum, selected4Partial);
 
-    const top3Values = [...selectedScoreValues].sort((a, b) => a - b).slice(0, 3);
+    const top3Values = [...scoredWithFallback].sort((a, b) => a - b).slice(0, 3);
     const top3Sum = top3Values.length ? top3Values.reduce((sum, value) => sum + value, 0) : null;
     const top3Partial = top3Values.length < 3;
     const top3Display = top3Sum === null
