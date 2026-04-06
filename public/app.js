@@ -103,8 +103,8 @@ function parseScoreValue(scoreText) {
     return 0;
   }
 
-  if (/^[+-]?\d+$/.test(value)) {
-    return Number.parseInt(value, 10);
+  if (/^[+-]?\d+(\.\d+)?$/.test(value)) {
+    return Number.parseFloat(value);
   }
 
   return null;
@@ -115,7 +115,12 @@ function formatScoreValue(scoreValue, partial = false) {
     return '-';
   }
 
-  const base = scoreValue === 0 ? 'E' : scoreValue > 0 ? `+${scoreValue}` : `${scoreValue}`;
+  const rounded = Math.round(scoreValue * 10) / 10;
+  const normalized = Object.is(rounded, -0) ? 0 : rounded;
+  const magnitude = Number.isInteger(Math.abs(normalized))
+    ? String(Math.abs(normalized))
+    : Math.abs(normalized).toFixed(1).replace(/\.0$/, '');
+  const base = normalized === 0 ? 'E' : normalized > 0 ? `+${magnitude}` : `-${magnitude}`;
   return partial ? `${base}*` : base;
 }
 

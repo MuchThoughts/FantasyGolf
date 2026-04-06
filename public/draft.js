@@ -75,8 +75,8 @@ function parseRelativeScore(scoreText) {
     return 0;
   }
 
-  if (/^[+-]?\d+$/.test(value)) {
-    return Number.parseInt(value, 10);
+  if (/^[+-]?\d+(\.\d+)?$/.test(value)) {
+    return Number.parseFloat(value);
   }
 
   return null;
