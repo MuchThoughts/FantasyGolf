@@ -327,11 +327,6 @@ tbody tr:hover {
   max-width: var(--major-sticky-col-1);
   padding-left: 0.4rem;
   padding-right: 0.4rem;
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  background: #ffffff;
-  box-shadow: var(--sticky-col-shadow);
 }
 
 .major-scoreboard-table th:nth-child(2),
@@ -342,7 +337,7 @@ tbody tr:hover {
   padding-left: 0.45rem;
   padding-right: 0.45rem;
   position: sticky;
-  left: var(--major-sticky-col-1);
+  left: 0;
   z-index: 2;
   background: #ffffff;
   box-shadow: var(--sticky-col-shadow);
@@ -350,13 +345,11 @@ tbody tr:hover {
   text-overflow: ellipsis;
 }
 
-.major-scoreboard-table thead th:nth-child(1),
 .major-scoreboard-table thead th:nth-child(2) {
   z-index: 4;
   background: #f1f4f4;
 }
 
-.major-scoreboard-table tbody tr:hover td:nth-child(1),
 .major-scoreboard-table tbody tr:hover td:nth-child(2) {
   background: #f8fbfa;
 }
