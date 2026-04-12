@@ -316,13 +316,17 @@ tbody tr:hover {
 }
 
 .major-scoreboard-table {
-  --major-sticky-col-1: 70px;
+  --major-sticky-col-1: 52px;
+  --major-sticky-col-2: 108px;
 }
 
 .major-scoreboard-table th:nth-child(1),
 .major-scoreboard-table td:nth-child(1) {
   min-width: var(--major-sticky-col-1);
   width: var(--major-sticky-col-1);
+  max-width: var(--major-sticky-col-1);
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
   position: sticky;
   left: 0;
   z-index: 2;
@@ -332,12 +336,18 @@ tbody tr:hover {
 
 .major-scoreboard-table th:nth-child(2),
 .major-scoreboard-table td:nth-child(2) {
-  min-width: 140px;
+  min-width: var(--major-sticky-col-2);
+  width: var(--major-sticky-col-2);
+  max-width: var(--major-sticky-col-2);
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
   position: sticky;
   left: var(--major-sticky-col-1);
   z-index: 2;
   background: #ffffff;
   box-shadow: var(--sticky-col-shadow);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .major-scoreboard-table thead th:nth-child(1),
