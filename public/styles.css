@@ -7,6 +7,7 @@
   --accent: #0f7a3d;
   --danger: #b1382b;
   --shadow: 0 18px 40px rgba(15, 24, 28, 0.08);
+  --sticky-col-shadow: inset -10px 0 9px -9px rgba(28, 48, 56, 0.25);
 }
 
 * {
@@ -286,6 +287,68 @@ tbody tr:hover {
 .team-top3-row td {
   background: #edf3f1;
   font-weight: 700;
+}
+
+.team-card .table-wrap table th:first-child,
+.team-card .table-wrap table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #ffffff;
+  box-shadow: var(--sticky-col-shadow);
+}
+
+.team-card .table-wrap table thead th:first-child {
+  z-index: 4;
+  background: #f1f4f4;
+}
+
+.team-card .table-wrap table tbody tr:hover td:first-child {
+  background: #f8fbfa;
+}
+
+.team-card .table-wrap table tfoot .team-total-row th:first-child {
+  background: #f7faf9;
+}
+
+.team-card .table-wrap table tfoot .team-top3-row th:first-child {
+  background: #edf3f1;
+}
+
+.major-scoreboard-table {
+  --major-sticky-col-1: 70px;
+}
+
+.major-scoreboard-table th:nth-child(1),
+.major-scoreboard-table td:nth-child(1) {
+  min-width: var(--major-sticky-col-1);
+  width: var(--major-sticky-col-1);
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #ffffff;
+  box-shadow: var(--sticky-col-shadow);
+}
+
+.major-scoreboard-table th:nth-child(2),
+.major-scoreboard-table td:nth-child(2) {
+  min-width: 140px;
+  position: sticky;
+  left: var(--major-sticky-col-1);
+  z-index: 2;
+  background: #ffffff;
+  box-shadow: var(--sticky-col-shadow);
+}
+
+.major-scoreboard-table thead th:nth-child(1),
+.major-scoreboard-table thead th:nth-child(2) {
+  z-index: 4;
+  background: #f1f4f4;
+}
+
+.major-scoreboard-table tbody tr:hover td:nth-child(1),
+.major-scoreboard-table tbody tr:hover td:nth-child(2) {
+  background: #f8fbfa;
 }
 
 .score {
@@ -581,10 +644,11 @@ tbody tr:hover {
 }
 
 .draft-pane .table-wrap {
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 .draft-players-table {
+  --draft-sticky-col-1: 72px;
   min-width: 0;
   table-layout: fixed;
 }
@@ -636,17 +700,40 @@ tbody tr:hover {
 
 .draft-players-table th:nth-child(1),
 .draft-players-table td:nth-child(1) {
-  width: 8%;
+  width: var(--draft-sticky-col-1);
+  min-width: var(--draft-sticky-col-1);
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #ffffff;
+  box-shadow: var(--sticky-col-shadow);
 }
 
 .draft-players-table th:nth-child(2),
 .draft-players-table td:nth-child(2) {
-  width: 28%;
+  min-width: 190px;
+  width: 190px;
   text-align: left;
+  position: sticky;
+  left: var(--draft-sticky-col-1);
+  z-index: 2;
+  background: #ffffff;
+  box-shadow: var(--sticky-col-shadow);
 }
 
 .draft-players-table th:nth-child(2) .draft-sort-button {
   justify-content: flex-start;
+}
+
+.draft-players-table thead th:nth-child(1),
+.draft-players-table thead th:nth-child(2) {
+  z-index: 4;
+  background: #f1f4f4;
+}
+
+.draft-players-table tbody tr:hover td:nth-child(1),
+.draft-players-table tbody tr:hover td:nth-child(2) {
+  background: #f8fbfa;
 }
 
 .draft-players-table td:nth-child(2) {
