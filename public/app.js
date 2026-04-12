@@ -1348,13 +1348,23 @@ function buildMajorScoreboardView(payload, majorKey) {
       return aValue - bValue;
     }
 
-    return a.team.localeCompare(b.team);
+    return 0;
   });
 
-  let rankCounter = 1;
+  let rankedCount = 0;
+  let currentRank = 0;
+  let previousTop3Value = null;
   const bodyRows = rows
     .map((row) => {
-      const rank = row.top3Value === null ? '—' : rankCounter++;
+      let rank = '—';
+      if (row.top3Value !== null) {
+        rankedCount += 1;
+        if (previousTop3Value === null || row.top3Value !== previousTop3Value) {
+          currentRank = rankedCount;
+          previousTop3Value = row.top3Value;
+        }
+        rank = currentRank;
+      }
 
       const pickCells = row.pickSlots
         .map((slot) => {
