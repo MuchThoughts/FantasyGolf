@@ -4,14 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fantasy Golf Majors Draft</title>
+    <meta name="theme-color" content="#0f7a3d" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/cottonwood-icon-192.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/cottonwood-icon-192.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="page">
       <header class="hero draft-hero">
-        <p class="eyebrow">Snake Draft</p>
-        <h1>Fantasy Golf Majors Draft</h1>
-        <p id="draft-subtitle" class="subtitle">Loading draft board...</p>
+        <div class="hero-brand">
+          <img
+            src="/icons/cottonwood-icon-192.png"
+            alt="Cottonwood Castle Common League logo"
+            class="hero-logo"
+          />
+          <div class="hero-brand-copy">
+            <p class="eyebrow">Snake Draft</p>
+            <h1>Fantasy Golf Majors Draft</h1>
+            <p id="draft-subtitle" class="subtitle">Loading draft board...</p>
+          </div>
+        </div>
         <div class="actions">
           <a href="/" class="ghost-link-button">Back to Summary</a>
           <button id="save-draft" type="button" disabled>Save League</button>
