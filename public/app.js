@@ -179,6 +179,25 @@ function getSeasonSummaryTabLabel() {
   return 'Season Summary';
 }
 
+function getSeasonSummaryMajorDateLabel(major) {
+  if (Number(selectedSeasonYear) !== 2026) {
+    return '';
+  }
+
+  const key = String(major?.key || '').toLowerCase();
+  const name = String(major?.name || '').toLowerCase();
+
+  if (key === 'us_open' || name.includes('u.s. open') || name.includes('us open')) {
+    return 'June 18-21';
+  }
+
+  if (key === 'the_open' || key === 'british_open' || name.includes('open championship') || name.includes('the open')) {
+    return 'July 16-19';
+  }
+
+  return '';
+}
+
 function getMajorByKey(majorKey) {
   return (currentPayload?.majors || []).find((major) => major.key === majorKey) || null;
 }
@@ -1480,8 +1499,6 @@ function buildSeasonSummaryScoreboardView(payload) {
     }
   }
 
-  const playedMajors = majors.filter((major) => playedMajorKeys.has(major.key));
-
   rows.sort((a, b) => {
     const aValue = a.totalValue === null ? Number.POSITIVE_INFINITY : a.totalValue;
     const bValue = b.totalValue === null ? Number.POSITIVE_INFINITY : b.totalValue;
@@ -1508,11 +1525,13 @@ function buildSeasonSummaryScoreboardView(payload) {
         rank = currentRank;
       }
 
-      const majorCells = playedMajors
+      const majorCells = majors
         .map((major) => {
           const entry = row.majorTotals.find((total) => total.major.key === major.key);
-          const display = entry?.display || '-';
-          return `<td class="score ${scoreClass(display)}">${display}</td>`;
+          const display = entry?.display || '';
+          const hasMajorData = playedMajorKeys.has(major.key);
+          const cellDisplay = hasMajorData ? display || '-' : '';
+          return `<td class="score ${scoreClass(cellDisplay)}">${cellDisplay}</td>`;
         })
         .join('');
 
@@ -1527,11 +1546,21 @@ function buildSeasonSummaryScoreboardView(payload) {
     })
     .join('');
 
-  const majorHeaderCells = playedMajors
-    .map((major) => `<th scope="col">${major.name}</th>`)
+  const majorHeaderCells = majors
+    .map((major) => {
+      const dateLabel = !playedMajorKeys.has(major.key)
+        ? getSeasonSummaryMajorDateLabel(major)
+        : '';
+      return `
+        <th scope="col">
+          <span class="major-header-title">${major.name}</span>
+          ${dateLabel ? `<span class="major-date-label">${dateLabel}</span>` : ''}
+        </th>
+      `;
+    })
     .join('');
 
-  const emptySeasonNote = playedMajors.length
+  const emptySeasonNote = playedMajorKeys.size
     ? ''
     : '<p class="footnote">No major scores are available yet for this season.</p>';
 

@@ -377,6 +377,44 @@ tbody tr:hover {
   background: #f8fbfa;
 }
 
+.season-summary-table {
+  --major-sticky-col-1: 44px;
+  --major-sticky-col-2: 96px;
+  width: max-content;
+  min-width: min(100%, 560px);
+}
+
+.season-summary-table th,
+.season-summary-table td {
+  padding: 0.42rem 0.48rem;
+}
+
+.season-summary-table th:nth-child(n + 3),
+.season-summary-table td:nth-child(n + 3) {
+  min-width: 76px;
+  width: 76px;
+}
+
+.season-summary-table th:nth-child(3),
+.season-summary-table td:nth-child(3) {
+  min-width: 70px;
+  width: 70px;
+}
+
+.major-header-title,
+.major-date-label {
+  display: block;
+}
+
+.major-date-label {
+  margin-top: 0.18rem;
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: none;
+}
+
 .score {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
