@@ -24,7 +24,7 @@ const excludeSchefflerCheckbox = document.getElementById('exclude-scheffler');
 
 const DEFAULT_LEAGUE_NAME = 'Davidson';
 const HOME_DEFAULT_LEAGUE_NAME = 'Neighborhood Competition';
-const HOME_DEFAULT_TAB = 'masters';
+const HOME_DEFAULT_TAB = 'season-summary';
 const DRAFT_SETUP_STORAGE_KEY = 'fantasyGolfDraftSetup';
 const DRAFT_SEASON_YEAR = 2025;
 
