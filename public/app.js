@@ -175,6 +175,10 @@ function getSeasonTabLabel() {
   return 'Player Level Summary';
 }
 
+function getSeasonSummaryTabLabel() {
+  return 'Season Summary';
+}
+
 function getMajorByKey(majorKey) {
   return (currentPayload?.majors || []).find((major) => major.key === majorKey) || null;
 }
@@ -1108,7 +1112,7 @@ function computeTop3FromSelections(team, majors, selections) {
 }
 
 function ensureValidActiveTab(payload) {
-  const allowedTabs = ['season', ...(payload.majors || []).map((major) => major.key)];
+  const allowedTabs = ['season', 'season-summary', ...(payload.majors || []).map((major) => major.key)];
   if (!allowedTabs.includes(activeTab)) {
     activeTab = 'season';
   }
@@ -1125,6 +1129,7 @@ function buildTabsMarkup(payload) {
   return `
     <nav class="view-tabs" aria-label="View Tabs">
       <button type="button" class="view-tab${activeTab === 'season' ? ' is-active' : ''}" data-tab="season">${getSeasonTabLabel()}</button>
+      <button type="button" class="view-tab${activeTab === 'season-summary' ? ' is-active' : ''}" data-tab="season-summary">${getSeasonSummaryTabLabel()}</button>
       ${majorTabs}
     </nav>
   `;
@@ -1423,13 +1428,147 @@ function buildMajorScoreboardView(payload, majorKey) {
   `;
 }
 
+function buildSeasonSummaryScoreboardView(payload) {
+  const majors = payload.majors || [];
+  const teams = payload.teams || [];
+
+  if (!teams.length) {
+    return '<p class="status">No users found in this league.</p>';
+  }
+
+  const rows = teams.map((team) => {
+    const state = ensureTeamState(team.name);
+    const top3DisplayData = state.hasSavedSelection
+      ? computeTop3FromSelections(team, majors, state.selections)
+      : {
+          majorTotals: team.totals?.top3?.majorTotals || {}
+        };
+
+    const majorTotals = majors.map((major) => {
+      const total = top3DisplayData.majorTotals?.[major.key] || {};
+      return {
+        major,
+        display: total.display || '-',
+        value: typeof total.value === 'number' ? total.value : null,
+        partial: total.partial === true
+      };
+    });
+
+    const countedMajors = majorTotals.filter((entry) => entry.value !== null);
+    const totalValue = countedMajors.length
+      ? countedMajors.reduce((sum, entry) => sum + entry.value, 0)
+      : null;
+    const totalPartial = countedMajors.some((entry) => entry.partial);
+    const totalDisplay = totalValue === null
+      ? '-'
+      : formatScoreValue(totalValue, totalPartial);
+
+    return {
+      team: team.name,
+      majorTotals,
+      totalDisplay,
+      totalValue
+    };
+  });
+
+  const playedMajorKeys = new Set();
+  for (const row of rows) {
+    for (const entry of row.majorTotals) {
+      if (entry.value !== null) {
+        playedMajorKeys.add(entry.major.key);
+      }
+    }
+  }
+
+  const playedMajors = majors.filter((major) => playedMajorKeys.has(major.key));
+
+  rows.sort((a, b) => {
+    const aValue = a.totalValue === null ? Number.POSITIVE_INFINITY : a.totalValue;
+    const bValue = b.totalValue === null ? Number.POSITIVE_INFINITY : b.totalValue;
+
+    if (aValue !== bValue) {
+      return aValue - bValue;
+    }
+
+    return 0;
+  });
+
+  let rankedCount = 0;
+  let currentRank = 0;
+  let previousTotalValue = null;
+  const bodyRows = rows
+    .map((row) => {
+      let rank = '—';
+      if (row.totalValue !== null) {
+        rankedCount += 1;
+        if (previousTotalValue === null || row.totalValue !== previousTotalValue) {
+          currentRank = rankedCount;
+          previousTotalValue = row.totalValue;
+        }
+        rank = currentRank;
+      }
+
+      const majorCells = playedMajors
+        .map((major) => {
+          const entry = row.majorTotals.find((total) => total.major.key === major.key);
+          const display = entry?.display || '-';
+          return `<td class="score ${scoreClass(display)}">${display}</td>`;
+        })
+        .join('');
+
+      return `
+        <tr>
+          <td>${rank}</td>
+          <td>${row.team}</td>
+          <td class="score ${scoreClass(row.totalDisplay)}">${row.totalDisplay}</td>
+          ${majorCells}
+        </tr>
+      `;
+    })
+    .join('');
+
+  const majorHeaderCells = playedMajors
+    .map((major) => `<th scope="col">${major.name}</th>`)
+    .join('');
+
+  const emptySeasonNote = playedMajors.length
+    ? ''
+    : '<p class="footnote">No major scores are available yet for this season.</p>';
+
+  return `
+    <section class="major-board">
+      <h3>${getSeasonSummaryTabLabel()}</h3>
+      <p class="major-subtitle">Ranks each user by their season total. Total is the sum of each completed major's Top 3 score.</p>
+      <div class="table-wrap">
+        <table class="major-scoreboard-table season-summary-table">
+          <thead>
+            <tr>
+              <th scope="col">Rank</th>
+              <th scope="col">User</th>
+              <th scope="col">Total</th>
+              ${majorHeaderCells}
+            </tr>
+          </thead>
+          <tbody>
+            ${bodyRows}
+          </tbody>
+        </table>
+      </div>
+      ${emptySeasonNote}
+      <p class="footnote">* Partial total due to missing player score(s) or fewer than the required picks.</p>
+    </section>
+  `;
+}
+
 function renderApp(payload) {
   ensureValidActiveTab(payload);
 
   const tabs = buildTabsMarkup(payload);
   const view = activeTab === 'season'
     ? buildSeasonView(payload)
-    : buildMajorScoreboardView(payload, activeTab);
+    : activeTab === 'season-summary'
+      ? buildSeasonSummaryScoreboardView(payload)
+      : buildMajorScoreboardView(payload, activeTab);
 
   teamsContainer.innerHTML = `${tabs}${view}`;
 }
@@ -1441,6 +1580,11 @@ function setDefaultStatusForTab() {
 
   if (activeTab === 'season') {
     statusNode.textContent = `Viewing ${selectedLeagueName} (${selectedSeasonYear}) data. Click Edit on any user table to choose up to 4 players per major.`;
+    return;
+  }
+
+  if (activeTab === 'season-summary') {
+    statusNode.textContent = `Viewing ${selectedLeagueName} ${selectedSeasonYear} season standings by each user's completed-major Top 3 totals.`;
     return;
   }
 
