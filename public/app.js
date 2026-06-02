@@ -172,7 +172,7 @@ function toFriendlyDate(value) {
 }
 
 function getSeasonTabLabel() {
-  return 'Season Summary';
+  return 'Player Level Summary';
 }
 
 function getMajorByKey(majorKey) {
