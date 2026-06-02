@@ -377,28 +377,35 @@ tbody tr:hover {
   background: #f8fbfa;
 }
 
+.season-summary-board {
+  max-width: 880px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .season-summary-table {
-  --major-sticky-col-1: 44px;
-  --major-sticky-col-2: 96px;
-  width: max-content;
-  min-width: min(100%, 560px);
+  --major-sticky-col-1: 48px;
+  --major-sticky-col-2: 128px;
+  width: 100%;
+  min-width: 720px;
+  table-layout: fixed;
 }
 
 .season-summary-table th,
 .season-summary-table td {
-  padding: 0.42rem 0.48rem;
+  padding: 0.5rem 0.62rem;
 }
 
 .season-summary-table th:nth-child(n + 3),
 .season-summary-table td:nth-child(n + 3) {
-  min-width: 76px;
-  width: 76px;
+  min-width: 100px;
+  width: 100px;
 }
 
 .season-summary-table th:nth-child(3),
 .season-summary-table td:nth-child(3) {
-  min-width: 70px;
-  width: 70px;
+  min-width: 88px;
+  width: 88px;
 }
 
 .major-header-title,
@@ -966,6 +973,35 @@ tbody tr:hover {
 
   .draft-search input {
     width: 100%;
+  }
+
+  .season-summary-board {
+    max-width: none;
+  }
+
+  .season-summary-table {
+    --major-sticky-col-1: 44px;
+    --major-sticky-col-2: 96px;
+    width: max-content;
+    min-width: min(100%, 560px);
+    table-layout: auto;
+  }
+
+  .season-summary-table th,
+  .season-summary-table td {
+    padding: 0.42rem 0.48rem;
+  }
+
+  .season-summary-table th:nth-child(n + 3),
+  .season-summary-table td:nth-child(n + 3) {
+    min-width: 76px;
+    width: 76px;
+  }
+
+  .season-summary-table th:nth-child(3),
+  .season-summary-table td:nth-child(3) {
+    min-width: 70px;
+    width: 70px;
   }
 
   th,

@@ -1565,7 +1565,7 @@ function buildSeasonSummaryScoreboardView(payload) {
     : '<p class="footnote">No major scores are available yet for this season.</p>';
 
   return `
-    <section class="major-board">
+    <section class="major-board season-summary-board">
       <h3>${getSeasonSummaryTabLabel()}</h3>
       <p class="major-subtitle">Ranks each user by their season total. Total is the sum of each completed major's Top 3 score.</p>
       <div class="table-wrap">
